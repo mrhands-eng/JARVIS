@@ -17,6 +17,9 @@ const VISIBLE_TOOLS = new Set([
   "game_mode",
   "focus_workspace",
   "rebuild_jarvis",
+  "schedule_reminder",
+  "list_reminders",
+  "cancel_reminder",
 ]);
 
 /** Show in HUD log — custom PC tools + code edits (self-programming). */
@@ -69,6 +72,15 @@ export function humanActivity(name: string, status: string): string {
   if (n.includes("game_mode")) return pick("Готовлю игровой режим…", "Игровой режим");
   if (n.includes("rebuild_jarvis") || n.includes("rebuild")) {
     return pick("Пересобираю себя…", "Сборка готова");
+  }
+  if (n.includes("list_reminders")) {
+    return pick("Сверяю напоминания…", "Список напоминаний");
+  }
+  if (n.includes("cancel_reminder")) {
+    return pick("Снимаю напоминание…", "Напоминание снято");
+  }
+  if (n.includes("schedule_reminder")) {
+    return pick("Ставлю напоминание…", "Напоминание поставлено");
   }
   if (n.includes("самолечен") || n.includes("self-heal") || n.includes("сбой:")) {
     return pick("Чиню себя…", "Починка завершена");

@@ -167,6 +167,15 @@ body {
   display: none;
 }
 
+.silence-btn {
+  font-size: 10px;
+  letter-spacing: 0.04em;
+  min-width: 48px;
+  font-weight: 600;
+  color: #c8e8ff;
+  border-color: rgba(0, 229, 255, 0.45) !important;
+}
+
 .log {
   flex: 1;
   overflow: auto;

@@ -14,6 +14,7 @@
   const input = document.getElementById("input");
   const btnMic = document.getElementById("btnMic");
   const btnMute = document.getElementById("btnMute");
+  const btnSilence = document.getElementById("btnSilence");
   const btnBrain = document.getElementById("btnBrain");
   const btnStop = document.getElementById("btnStop");
   const confirmBox = document.getElementById("confirm");
@@ -30,6 +31,10 @@
   let audioUrl = null;
   const audioQueue = [];
   let playing = false;
+  /** Bumped on stop — onended / late IPC must not chain the next chunk. */
+  let audioGen = 0;
+  /** Drop play-audio from cancelled speak() generations. */
+  let ttsSuppressAfter = 0;
   let mediaStream = null;
   let audioCtx = null;
   let processor = null;
@@ -45,7 +50,11 @@
   const LIVE_STT_MS = 1500;
   const LIVE_STT_MIN_PEAK = 0.003;
 
-  function stopAudio() {
+  function stopAudio(extra) {
+    audioGen += 1;
+    if (extra && typeof extra.seq === "number") {
+      ttsSuppressAfter = Math.max(ttsSuppressAfter, extra.seq);
+    }
     audioQueue.length = 0;
     playing = false;
     if (audioEl) {
@@ -68,6 +77,11 @@
     if (playing) return;
     const payload = audioQueue.shift();
     if (!payload) return;
+    if (typeof payload.seq === "number" && payload.seq <= ttsSuppressAfter) {
+      playNext();
+      return;
+    }
+    const gen = audioGen;
     playing = true;
     try {
       const binary = atob(payload.base64);
@@ -82,15 +96,18 @@
       audioUrl = URL.createObjectURL(blob);
       audioEl = new Audio(audioUrl);
       audioEl.onended = () => {
+        if (gen !== audioGen) return;
         playing = false;
         playNext();
       };
       audioEl.onerror = () => {
+        if (gen !== audioGen) return;
         playing = false;
         append("system", "Audio play error: decode/playback failed");
         playNext();
       };
       audioEl.play().catch((e) => {
+        if (gen !== audioGen) return;
         playing = false;
         append("system", "Audio play error: " + e);
         playNext();
@@ -104,6 +121,7 @@
 
   function playAudio(payload) {
     if (!payload || !payload.base64) return;
+    if (typeof payload.seq === "number" && payload.seq <= ttsSuppressAfter) return;
     if (!payload.queue) stopAudio();
     audioQueue.push(payload);
     playNext();
@@ -550,7 +568,17 @@
   btnMute.addEventListener("click", async () => {
     muted = await api.setMute(!muted);
     btnMute.textContent = muted ? "🔇" : "🔊";
+    if (muted) {
+      stopAudio();
+      if (api.stopTts) void api.stopTts();
+    }
   });
+  if (btnSilence) {
+    btnSilence.addEventListener("click", () => {
+      stopAudio();
+      if (api.stopTts) void api.stopTts();
+    });
+  }
   if (btnBrain) {
     btnBrain.addEventListener("click", async () => {
       const next = brainMode === "local" ? "cursor" : "local";
@@ -610,8 +638,14 @@
     if (muted) stopAudio();
   });
   if (api.onPlayAudio) api.onPlayAudio((payload) => playAudio(payload));
-  if (api.onStopAudio) api.onStopAudio(() => stopAudio());
+  if (api.onStopAudio) api.onStopAudio((p) => stopAudio(p));
   if (api.onBrainModeChanged) api.onBrainModeChanged((m) => applyBrainMode(m));
+  if (api.onReminder) {
+    api.onReminder(({ text }) => {
+      append("jarvis", text);
+      setActivity("напоминание");
+    });
+  }
 
   api.getConfig().then((cfg) => {
     muted = cfg.muted;

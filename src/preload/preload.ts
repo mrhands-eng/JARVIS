@@ -4,6 +4,7 @@ contextBridge.exposeInMainWorld("jarvis", {
   askText: (text: string) => ipcRenderer.invoke("ask-text", text) as Promise<string>,
   stopTask: () => ipcRenderer.invoke("stop-task") as Promise<string>,
   setMute: (value: boolean) => ipcRenderer.invoke("set-mute", value) as Promise<boolean>,
+  stopTts: () => ipcRenderer.invoke("stop-tts") as Promise<boolean>,
   onStopTaskHotkey: (cb: () => void) => {
     const handler = () => cb();
     ipcRenderer.on("stop-task-hotkey", handler);
@@ -64,14 +65,22 @@ contextBridge.exposeInMainWorld("jarvis", {
     ipcRenderer.on("mute-changed", handler);
     return () => ipcRenderer.removeListener("mute-changed", handler);
   },
-  onPlayAudio: (cb: (payload: { mime: string; base64: string }) => void) => {
-    const handler = (_: unknown, payload: { mime: string; base64: string }) => cb(payload);
+  onPlayAudio: (cb: (payload: { mime: string; base64: string; queue?: boolean; seq?: number }) => void) => {
+    const handler = (
+      _: unknown,
+      payload: { mime: string; base64: string; queue?: boolean; seq?: number }
+    ) => cb(payload);
     ipcRenderer.on("play-audio", handler);
     return () => ipcRenderer.removeListener("play-audio", handler);
   },
-  onStopAudio: (cb: () => void) => {
-    const handler = () => cb();
+  onStopAudio: (cb: (payload: { seq?: number }) => void) => {
+    const handler = (_: unknown, payload: { seq?: number }) => cb(payload || {});
     ipcRenderer.on("stop-audio", handler);
     return () => ipcRenderer.removeListener("stop-audio", handler);
+  },
+  onReminder: (cb: (payload: { text: string }) => void) => {
+    const handler = (_: unknown, payload: { text: string }) => cb(payload);
+    ipcRenderer.on("reminder", handler);
+    return () => ipcRenderer.removeListener("reminder", handler);
   },
 });

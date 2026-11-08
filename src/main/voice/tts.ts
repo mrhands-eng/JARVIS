@@ -1,14 +1,11 @@
-import { execFile } from "child_process";
+import { ChildProcess, spawn } from "child_process";
 import fs from "fs";
 import os from "os";
 import path from "path";
 import { Readable } from "stream";
-import { promisify } from "util";
 import { MsEdgeTTS, OUTPUT_FORMAT } from "msedge-tts";
 import { logError, logInfo } from "../logger";
 import { projectRoot } from "../tools/allowlist";
-
-const execFileAsync = promisify(execFile);
 
 type VoiceConfig = {
   provider: "edge" | "elevenlabs";
@@ -28,12 +25,27 @@ type VoiceConfig = {
   chunkSize?: number;
 };
 
-type PlayFn = (payload: { mime: string; base64: string; queue?: boolean }) => void;
-type StopFn = () => void;
+type PlayFn = (payload: { mime: string; base64: string; queue?: boolean; seq?: number }) => void;
+type StopFn = (seq: number) => void;
 
 let playFn: PlayFn | null = null;
 let stopFn: StopFn | null = null;
 let speakSeq = 0;
+let psChild: ChildProcess | null = null;
+
+export function currentSpeakSeq(): number {
+  return speakSeq;
+}
+
+function killPsChild(): void {
+  if (!psChild) return;
+  try {
+    psChild.kill();
+  } catch {
+    /* ignore */
+  }
+  psChild = null;
+}
 
 export function setAudioHandlers(play: PlayFn, stop: StopFn): void {
   playFn = play;
@@ -43,7 +55,8 @@ export function setAudioHandlers(play: PlayFn, stop: StopFn): void {
 /** Interrupt any in-flight or queued TTS immediately. */
 export function stopSpeaking(): void {
   speakSeq += 1;
-  stopFn?.();
+  killPsChild();
+  stopFn?.(speakSeq);
 }
 
 function loadConfig(): VoiceConfig {
@@ -198,8 +211,27 @@ async function synthesizeElevenLabs(text: string, cfg: VoiceConfig): Promise<Buf
   return Buffer.from(await res.arrayBuffer());
 }
 
+async function runPsScript(script: string, mySeq: number): Promise<void> {
+  if (mySeq !== speakSeq) return;
+  killPsChild();
+  const child = spawn("powershell.exe", ["-NoProfile", "-Command", script], {
+    windowsHide: true,
+    stdio: "ignore",
+  });
+  psChild = child;
+  await new Promise<void>((resolve) => {
+    const done = () => {
+      if (psChild === child) psChild = null;
+      resolve();
+    };
+    child.once("exit", done);
+    child.once("error", done);
+  });
+}
+
 /** Offline fallback — Windows SAPI (robotic, but never silent). */
-async function speakViaWindowsSapi(text: string): Promise<void> {
+async function speakViaWindowsSapi(text: string, mySeq: number): Promise<void> {
+  if (mySeq !== speakSeq) return;
   const safe = text.replace(/'/g, "''").slice(0, 800);
   const script = `
 Add-Type -AssemblyName System.Speech
@@ -213,18 +245,16 @@ try {
 \$s.Speak([string]'${safe}')
 \$s.Dispose()
 `;
-  await execFileAsync("powershell.exe", ["-NoProfile", "-Command", script], {
-    windowsHide: true,
-    timeout: 120000,
-  });
+  await runPsScript(script, mySeq);
 }
 
-async function playMp3(audio: Buffer, queue: boolean): Promise<void> {
+async function playMp3(audio: Buffer, queue: boolean, mySeq: number): Promise<void> {
+  if (mySeq !== speakSeq) return;
   if (!playFn) {
-    await playViaWindows(audio);
+    await playViaWindows(audio, mySeq);
     return;
   }
-  playFn({ mime: "audio/mpeg", base64: audio.toString("base64"), queue });
+  playFn({ mime: "audio/mpeg", base64: audio.toString("base64"), queue, seq: mySeq });
 }
 
 /** Neural JARVIS TTS — one locked voice for the whole reply (no mid-message timbre swap). */
@@ -234,7 +264,8 @@ export async function speak(text: string): Promise<void> {
   if (!cleaned) return;
 
   const mySeq = ++speakSeq;
-  stopFn?.();
+  killPsChild();
+  stopFn?.(speakSeq);
 
   const preferEleven =
     (cfg.provider === "elevenlabs" || !!process.env.ELEVENLABS_API_KEY) &&
@@ -260,7 +291,8 @@ export async function speak(text: string): Promise<void> {
         audio = await synthesizeEdgeChunk(chunk, voice, cfg);
       }
       if (mySeq !== speakSeq) return;
-      await playMp3(audio, !first);
+      await playMp3(audio, !first, mySeq);
+      if (mySeq !== speakSeq) return;
       first = false;
       played = true;
     }
@@ -271,14 +303,15 @@ export async function speak(text: string): Promise<void> {
     // Last resort: local Windows voice so greetings are never silent
     try {
       logInfo("tts", "falling back to Windows SAPI");
-      await speakViaWindowsSapi(cleaned);
+      await speakViaWindowsSapi(cleaned, mySeq);
     } catch (e2) {
       logError("tts.sapi", e2);
     }
   }
 }
 
-async function playViaWindows(mp3: Buffer): Promise<void> {
+async function playViaWindows(mp3: Buffer, mySeq: number): Promise<void> {
+  if (mySeq !== speakSeq) return;
   const file = path.join(os.tmpdir(), `stark-tts-${Date.now()}.mp3`);
   fs.writeFileSync(file, mp3);
   const uri = "file:///" + file.replace(/\\/g, "/");
@@ -299,8 +332,5 @@ if ($m.NaturalDuration.HasTimeSpan) {
 $m.Close()
 Remove-Item -LiteralPath '${file.replace(/'/g, "''")}' -Force -ErrorAction SilentlyContinue
 `;
-  await execFileAsync("powershell.exe", ["-NoProfile", "-Command", script], {
-    windowsHide: true,
-    timeout: 180000,
-  });
+  await runPsScript(script, mySeq);
 }

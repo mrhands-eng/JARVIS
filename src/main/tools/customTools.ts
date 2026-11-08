@@ -26,6 +26,7 @@ import {
   updateSystem,
 } from "../memory/store";
 import { runUserCommand } from "./shellSafe";
+import { cancelReminder, listReminders, scheduleReminder } from "../reminders";
 
 function safe(
   fn: (args: Record<string, unknown>) => Promise<string> | string
@@ -316,6 +317,62 @@ export function buildCustomTools(): Record<string, SDKCustomTool> {
         required: ["keepTitle"],
       },
       execute: safe(async (args) => minimizeOthersKeep(String(args.keepTitle ?? "Cursor"))),
+    },
+    list_reminders: {
+      description:
+        "List pending reminders after pruning missed/expired ones from disk. " +
+        "Always call this (not memory) when the user asks what reminders are set, «какие напоминания», delete/cancel context, etc.",
+      annotations: { title: "List reminders" },
+      inputSchema: { type: "object", properties: {} },
+      execute: safe(async () => listReminders()),
+    },
+    cancel_reminder: {
+      description:
+        "Remove a pending reminder by id or message substring. Prunes inactive rows first. " +
+        "Use when the user asks to delete/cancel a reminder.",
+      annotations: { title: "Cancel reminder" },
+      inputSchema: {
+        type: "object",
+        properties: {
+          id: { type: "string", description: "Reminder id from list_reminders" },
+          message_contains: {
+            type: "string",
+            description: "Case-insensitive substring of the reminder text",
+          },
+        },
+      },
+      execute: safe(async (args) =>
+        cancelReminder({
+          id: args.id !== undefined ? String(args.id) : undefined,
+          message_contains:
+            args.message_contains !== undefined ? String(args.message_contains) : undefined,
+        })
+      ),
+    },
+    schedule_reminder: {
+      description:
+        "Schedule a one-shot reminder while JARVIS is running (tray counts). " +
+        "When it fires: posts to HUD chat and shows a Windows notification if HUD is hidden or unfocused. " +
+        "Stale/missed rows are pruned on schedule, list, and fire. " +
+        "Prefer this over run_command/schtasks for «напомни через …».",
+      annotations: { title: "Schedule reminder" },
+      inputSchema: {
+        type: "object",
+        properties: {
+          message: { type: "string", description: "What to remind the user about" },
+          in_minutes: { type: "number", description: "Delay in minutes (e.g. 60)" },
+          in_seconds: { type: "number", description: "Delay in seconds (for quick tests)" },
+        },
+        required: ["message"],
+      },
+      execute: safe(async (args) => {
+        const msg = String(args.message ?? "");
+        const inMinutes =
+          args.in_minutes !== undefined ? Number(args.in_minutes) : undefined;
+        const inSeconds =
+          args.in_seconds !== undefined ? Number(args.in_seconds) : undefined;
+        return scheduleReminder(msg, { inMinutes, inSeconds });
+      }),
     },
     rebuild_jarvis: {
       description:

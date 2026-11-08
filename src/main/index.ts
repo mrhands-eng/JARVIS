@@ -35,6 +35,7 @@ import { beginDialogSession, rollCurrentIntoSummary } from "./memory/dialog";
 import { isSttReady, transcribeWavBuffer, type SttResult } from "./voice/stt";
 import { setAudioHandlers, speak, stopSpeaking } from "./voice/tts";
 import { logError, logInfo } from "./logger";
+import { configureReminders } from "./reminders";
 
 let win: BrowserWindow | null = null;
 let tray: Tray | null = null;
@@ -153,8 +154,16 @@ function registerIpc(): void {
 
   setAudioHandlers(
     (payload) => win?.webContents.send("play-audio", payload),
-    () => win?.webContents.send("stop-audio")
+    (seq) => win?.webContents.send("stop-audio", { seq })
   );
+
+  configureReminders({
+    sendHud: (text) => win?.webContents.send("reminder", { text }),
+    hudVisible: () => !!win?.isVisible(),
+    hudFocused: () => !!win?.isFocused(),
+    speak,
+    isMuted: () => muted,
+  });
 
   configureSelfHeal({
     speak,
@@ -279,6 +288,11 @@ function registerIpc(): void {
   ipcMain.handle("set-mute", (_e, value: boolean) => {
     muted = !!value;
     return muted;
+  });
+
+  ipcMain.handle("stop-tts", () => {
+    stopSpeaking();
+    return true;
   });
 
   ipcMain.handle("stop-task", async () => {
@@ -454,6 +468,10 @@ if (!gotLock) {
       const t = details?.mediaType;
       return !t || t === "audio" || t === "unknown";
     });
+
+    if (process.platform === "win32") {
+      app.setAppUserModelId("stark-os.jarvis");
+    }
 
     // Enables Ctrl+C / Ctrl+A accelerators for selectable HUD text
     Menu.setApplicationMenu(
