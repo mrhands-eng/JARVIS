@@ -1,0 +1,279 @@
+:root {
+  --bg: rgba(5, 8, 15, 0.82);
+  --cyan: #00e5ff;
+  --cyan-dim: #007a8a;
+  --text: #e8f7ff;
+  --muted: #7a9bb0;
+  --danger: #ff3355;
+  --glow: rgba(0, 229, 255, 0.35);
+  --font: "Segoe UI", "Consolas", system-ui, sans-serif;
+}
+
+* {
+  box-sizing: border-box;
+}
+
+html,
+body {
+  margin: 0;
+  width: 100%;
+  height: 100%;
+  overflow: hidden;
+  background: transparent;
+  font-family: var(--font);
+  color: var(--text);
+  user-select: none;
+}
+
+.log,
+.log .body,
+.composer input,
+.confirm-text {
+  user-select: text;
+  -webkit-user-select: text;
+  cursor: text;
+}
+
+.hud {
+  height: 100%;
+  margin: 8px;
+  padding: 14px;
+  border: 1px solid rgba(0, 229, 255, 0.35);
+  border-radius: 4px;
+  background:
+    linear-gradient(180deg, rgba(0, 229, 255, 0.08), transparent 28%),
+    var(--bg);
+  box-shadow: 0 0 24px var(--glow), inset 0 0 40px rgba(0, 229, 255, 0.05);
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  backdrop-filter: blur(12px);
+  -webkit-app-region: drag;
+}
+
+.top {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.brand {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+}
+
+.reactor {
+  width: 18px;
+  height: 18px;
+  border-radius: 50%;
+  background: radial-gradient(circle at 35% 35%, #fff, var(--cyan) 45%, #003844 80%);
+  box-shadow: 0 0 12px var(--cyan);
+  animation: pulse 2.4s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%,
+  100% {
+    box-shadow: 0 0 8px var(--cyan);
+  }
+  50% {
+    box-shadow: 0 0 18px var(--cyan), 0 0 28px var(--glow);
+  }
+}
+
+.title {
+  font-size: 13px;
+  letter-spacing: 0.28em;
+  font-weight: 600;
+}
+
+.status {
+  font-size: 11px;
+  color: var(--cyan);
+  letter-spacing: 0.12em;
+  margin-top: 2px;
+}
+
+.activity {
+  font-size: 11px;
+  color: var(--muted);
+  margin-top: 3px;
+  max-width: 260px;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.status.error {
+  color: var(--danger);
+}
+
+.status.thinking {
+  color: #ffe08a;
+}
+
+.controls {
+  display: flex;
+  gap: 6px;
+  -webkit-app-region: no-drag;
+}
+
+.controls button,
+.composer button,
+.confirm-actions button {
+  background: rgba(0, 229, 255, 0.08);
+  border: 1px solid rgba(0, 229, 255, 0.35);
+  color: var(--text);
+  border-radius: 2px;
+  padding: 6px 10px;
+  cursor: pointer;
+}
+
+.controls button:hover,
+.composer button:hover,
+.confirm-actions button:hover {
+  background: rgba(0, 229, 255, 0.18);
+}
+
+.brain-btn {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  min-width: 64px;
+  font-weight: 600;
+}
+
+.brain-btn.local {
+  color: #ffe08a;
+  border-color: rgba(255, 224, 138, 0.55);
+  background: rgba(255, 224, 138, 0.1);
+}
+
+.stop-btn {
+  font-size: 10px;
+  letter-spacing: 0.08em;
+  min-width: 52px;
+  font-weight: 700;
+  color: #ffb3be;
+  border-color: rgba(255, 51, 85, 0.55) !important;
+  background: rgba(255, 51, 85, 0.14) !important;
+}
+
+.stop-btn:hover {
+  background: rgba(255, 51, 85, 0.28) !important;
+}
+
+.stop-btn.hidden {
+  display: none;
+}
+
+.log {
+  flex: 1;
+  overflow: auto;
+  border: 1px solid rgba(0, 229, 255, 0.15);
+  background: rgba(0, 0, 0, 0.25);
+  padding: 10px;
+  font-size: 12px;
+  line-height: 1.45;
+  -webkit-app-region: no-drag;
+}
+
+.msg {
+  margin-bottom: 8px;
+}
+
+.msg .role {
+  color: var(--cyan-dim);
+  font-size: 10px;
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.msg.user .role {
+  color: var(--muted);
+}
+
+.live-voice {
+  font-size: 13px;
+  line-height: 1.4;
+  padding: 7px 10px;
+  border: 1px dashed rgba(0, 229, 255, 0.4);
+  background: rgba(0, 229, 255, 0.07);
+  color: var(--text);
+  min-height: 1.5em;
+  border-radius: 2px;
+  -webkit-app-region: no-drag;
+  user-select: text;
+  -webkit-user-select: text;
+}
+
+.live-voice.hidden {
+  display: none;
+}
+
+.live-voice.interim {
+  color: #b8ecf8;
+}
+
+.composer {
+  display: flex;
+  gap: 8px;
+  -webkit-app-region: no-drag;
+}
+
+.composer input,
+.composer button {
+  -webkit-app-region: no-drag;
+}
+
+.composer input {
+  flex: 1;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(0, 229, 255, 0.3);
+  color: var(--text);
+  padding: 8px 10px;
+  outline: none;
+  border-radius: 2px;
+}
+
+.foot {
+  font-size: 10px;
+  color: var(--muted);
+  letter-spacing: 0.08em;
+}
+
+.confirm {
+  border: 1px solid rgba(255, 51, 85, 0.5);
+  background: rgba(40, 0, 10, 0.55);
+  padding: 10px;
+  -webkit-app-region: no-drag;
+}
+
+.confirm.hidden {
+  display: none;
+}
+
+.confirm-text {
+  margin-bottom: 8px;
+  font-size: 12px;
+}
+
+.confirm-actions {
+  display: flex;
+  gap: 8px;
+}
+
+.confirm-actions .danger {
+  border-color: rgba(255, 51, 85, 0.55);
+  color: #ffc0cb;
+}
+
+.hint {
+  margin-top: 6px;
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.listening .reactor {
+  animation: pulse 0.6s ease-in-out infinite;
+}

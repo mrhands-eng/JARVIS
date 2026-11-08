@@ -1,0 +1,16 @@
+node_modules/
+dist/
+.env
+*.log
+.DS_Store
+Thumbs.db
+app-logs/
+# Private JARVIS memory — stays on this PC only
+data/memory/
+# Local Whisper / STT model cache
+data/models/
+# STT debug WAVs + mirrored jarvis.log
+data/logs/
+# JARVIS-only Ollama models (not shared with the rest of the PC)
+data/ollama/
+data/brain-mode.json

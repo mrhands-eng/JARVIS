@@ -1,0 +1,49 @@
+<!DOCTYPE html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'self' 'unsafe-inline'; script-src 'self'; connect-src 'self'; media-src 'self' data: blob:; img-src 'self' data: blob:" />
+    <title>JARVIS</title>
+    <link rel="stylesheet" href="styles.css" />
+  </head>
+  <body>
+    <div id="hud" class="hud">
+      <header class="top">
+        <div class="brand">
+          <span class="reactor"></span>
+          <div>
+            <div class="title">J.A.R.V.I.S.</div>
+            <div id="status" class="status">STANDBY</div>
+            <div id="activity" class="activity">ожидание</div>
+          </div>
+        </div>
+        <div class="controls">
+          <button id="btnBrain" class="brain-btn" title="Переключить Cursor ↔ локальный ИИ">CURSOR</button>
+          <button id="btnStop" class="stop-btn hidden" title="Остановить текущую задачу (Ctrl+Shift+X)">STOP</button>
+          <button id="btnMute" title="Mute TTS">🔊</button>
+          <button id="btnMic" title="Push to talk">🎤</button>
+        </div>
+      </header>
+
+      <div id="log" class="log"></div>
+
+      <div id="confirm" class="confirm hidden">
+        <div id="confirmText" class="confirm-text"></div>
+        <div class="confirm-actions">
+          <button id="btnYes">Confirm</button>
+          <button id="btnNo" class="danger">Cancel</button>
+        </div>
+        <div class="hint">Ctrl+Shift+Y / Ctrl+Shift+N</div>
+      </div>
+
+      <div id="liveVoice" class="live-voice hidden" aria-live="polite" title="Распознавание в реальном времени"></div>
+
+      <form id="form" class="composer">
+        <input id="input" type="text" placeholder="Ask JARVIS… (Ctrl+Shift+J = voice)" autocomplete="off" />
+        <button type="submit">Send</button>
+      </form>
+      <footer class="foot">Stark OS · STOP = Ctrl+Shift+X · Ctrl+Shift+H = HUD</footer>
+    </div>
+    <script src="app.js"></script>
+  </body>
+</html>

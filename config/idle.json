@@ -1,0 +1,7 @@
+{
+  "startHidden": true,
+  "idleSleepMs": 180000,
+  "hideHudOnIdle": true,
+  "disposeBrainOnIdle": true,
+  "stopOllamaOnIdle": true
+}

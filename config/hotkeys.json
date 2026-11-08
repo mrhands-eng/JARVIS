@@ -1,0 +1,7 @@
+{
+  "pushToTalk": "CommandOrControl+Shift+J",
+  "toggleHud": "CommandOrControl+Shift+H",
+  "confirmYes": "CommandOrControl+Shift+Y",
+  "confirmNo": "CommandOrControl+Shift+N",
+  "stopTask": "CommandOrControl+Shift+X"
+}

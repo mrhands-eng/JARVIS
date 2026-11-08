@@ -1,0 +1,23 @@
+{
+  "name": "Stark Arc",
+  "background": "#05080F",
+  "foreground": "#E8F7FF",
+  "cursorColor": "#00E5FF",
+  "selectionBackground": "#007A8A",
+  "black": "#05080F",
+  "red": "#C41E3A",
+  "green": "#2EFFA0",
+  "yellow": "#C9A227",
+  "blue": "#00E5FF",
+  "purple": "#7A9BB0",
+  "cyan": "#00E5FF",
+  "white": "#E8F7FF",
+  "brightBlack": "#1A2A3A",
+  "brightRed": "#FF3355",
+  "brightGreen": "#6CFFC0",
+  "brightYellow": "#FFE08A",
+  "brightBlue": "#66F0FF",
+  "brightPurple": "#A8C4D4",
+  "brightCyan": "#99F6FF",
+  "brightWhite": "#FFFFFF"
+}

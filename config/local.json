@@ -1,0 +1,15 @@
+{
+  "enabled": true,
+  "endpoint": "http://127.0.0.1:11435",
+  "modelsDir": "data/ollama",
+  "model": "qwen2.5:7b",
+  "fallbackModel": "qwen2.5:14b",
+  "reason": "RTX 5060 8GB + 32GB + Ryzen 7 8700F. Models live only under stark-os/data/ollama (port 11435).",
+  "timeoutMs": 180000,
+  "preferLocalWhenOffline": true,
+  "preferLocalWhenCursorFails": true,
+  "routeSimpleToLocal": false,
+  "routeShortChars": 72,
+  "routeLongChars": 320,
+  "ollamaIdleStopMs": 300000
+}

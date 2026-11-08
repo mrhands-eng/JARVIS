@@ -1,0 +1,72 @@
+{
+  "apps": {
+    "cursor": {
+      "label": "Cursor",
+      "paths": ["D:\\cursor\\Cursor.exe", "C:\\Users\\user\\AppData\\Local\\Programs\\cursor\\Cursor.exe"]
+    },
+    "steam": {
+      "label": "Steam",
+      "paths": ["C:\\Program Files (x86)\\Steam\\steam.exe"]
+    },
+    "discord": {
+      "label": "Discord",
+      "paths": ["C:\\Users\\user\\AppData\\Local\\Discord\\Update.exe"],
+      "args": ["--processStart", "Discord.exe"]
+    },
+    "zen": {
+      "label": "Zen Browser",
+      "paths": ["C:\\Program Files\\Zen Browser\\zen.exe"]
+    },
+    "chrome": {
+      "label": "Chrome",
+      "paths": [
+        "C:\\Program Files\\Google\\Chrome\\Application\\chrome.exe",
+        "C:\\Program Files (x86)\\Google\\Chrome\\Application\\chrome.exe"
+      ]
+    },
+    "edge": {
+      "label": "Edge",
+      "paths": ["C:\\Program Files (x86)\\Microsoft\\Edge\\Application\\msedge.exe"]
+    },
+    "terminal": {
+      "label": "Windows Terminal",
+      "paths": [
+        "C:\\Users\\user\\AppData\\Local\\Microsoft\\WindowsApps\\wt.exe",
+        "C:\\Program Files\\Windows Terminal\\wt.exe"
+      ]
+    },
+    "explorer": {
+      "label": "Explorer",
+      "paths": ["C:\\Windows\\explorer.exe"]
+    },
+    "telegram": {
+      "label": "Telegram",
+      "paths": ["C:\\Users\\user\\AppData\\Roaming\\Telegram Desktop\\Telegram.exe"]
+    },
+    "notepad": {
+      "label": "Notepad",
+      "paths": ["C:\\Windows\\System32\\notepad.exe"]
+    },
+    "calc": {
+      "label": "Calculator",
+      "paths": ["C:\\Windows\\System32\\calc.exe"]
+    },
+    "taskmgr": {
+      "label": "Task Manager",
+      "paths": ["C:\\Windows\\System32\\Taskmgr.exe"]
+    },
+    "spotify": {
+      "label": "Spotify",
+      "paths": ["C:\\Users\\user\\AppData\\Roaming\\Spotify\\Spotify.exe"]
+    },
+    "code": {
+      "label": "VS Code",
+      "paths": [
+        "C:\\Users\\user\\AppData\\Local\\Programs\\Microsoft VS Code\\Code.exe",
+        "C:\\Program Files\\Microsoft VS Code\\Code.exe"
+      ]
+    }
+  },
+  "projectsRoot": "D:\\Projects",
+  "gameModeClose": ["Discord", "zen", "Telegram", "chrome", "msedge"]
+}

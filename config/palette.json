@@ -1,0 +1,14 @@
+{
+  "name": "Stark Arc",
+  "background": "#05080F",
+  "surface": "#0A1220",
+  "cyan": "#00E5FF",
+  "cyanDim": "#007A8A",
+  "red": "#C41E3A",
+  "gold": "#C9A227",
+  "text": "#E8F7FF",
+  "muted": "#7A9BB0",
+  "glow": "rgba(0, 229, 255, 0.45)",
+  "danger": "#FF3355",
+  "ok": "#2EFFA0"
+}

@@ -1,0 +1,22 @@
+{
+  "provider": "edge",
+  "edge": {
+    "voiceEn": "en-GB-RyanNeural",
+    "voiceRu": "ru-RU-DmitryNeural",
+    "lockVoice": "ru-RU-DmitryNeural",
+    "rate": "-8%",
+    "pitch": "",
+    "volume": ""
+  },
+  "elevenlabs": {
+    "voiceId": "",
+    "modelId": "eleven_multilingual_v2"
+  },
+  "stt": {
+    "model": "Xenova/whisper-base",
+    "language": "russian",
+    "task": "transcribe"
+  },
+  "maxChars": 1600,
+  "chunkSize": 320
+}

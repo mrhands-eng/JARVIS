@@ -1,0 +1,5 @@
+{
+    "Steam":  "\"C:\\Program Files (x86)\\Steam\\steam.exe\" -silent",
+    "Discord":  "\"C:\\Users\\user\\AppData\\Local\\Discord\\Update.exe\" --processStart Discord.exe --process-start-args \"--start-inactive\"",
+    "PlanetVPN":  "C:\\Program Files (x86)\\PlanetVPN\\PlanetVPN.exe"
+}
