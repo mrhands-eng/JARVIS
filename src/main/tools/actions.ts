@@ -3,7 +3,7 @@ import fs from "fs";
 import os from "os";
 import path from "path";
 import { promisify } from "util";
-import { loadAllowlist, projectRoot, resolveAppPath } from "./allowlist";
+import { cursorProjectsRoot, loadAllowlist, projectRoot, resolveAppPath } from "./allowlist";
 
 const execFileAsync = promisify(execFile);
 
@@ -139,6 +139,154 @@ export async function openPath(target: string): Promise<string> {
   return `Opened ${abs}`;
 }
 
+function userProfileDir(): string {
+  return process.env.USERPROFILE || os.homedir();
+}
+
+function isAllowedParentDir(abs: string): boolean {
+  const p = path.resolve(abs).toLowerCase();
+  const home = path.resolve(userProfileDir()).toLowerCase();
+  if (p === home || p.startsWith(home + path.sep)) return true;
+  // Any folder on secondary drives D:…Z: (typical data disks on this PC)
+  if (/^[d-z]:\\/.test(p) || /^[d-z]:$/.test(p)) return true;
+  const projects = path.resolve(loadAllowlist().projectsRoot || "D:\\Projects").toLowerCase();
+  if (p === projects || p.startsWith(projects + path.sep)) return true;
+  return false;
+}
+
+function resolveFolderBase(where: string): { base: string; label: string } | { error: string } {
+  const raw = String(where || "desktop").trim();
+  const key = raw.toLowerCase();
+  const home = userProfileDir();
+  const map: Record<string, { base: string; label: string }> = {
+    desktop: {
+      base: path.join(home, "Desktop"),
+      label: "Desktop",
+    },
+    documents: {
+      base: path.join(home, "Documents"),
+      label: "Documents",
+    },
+    downloads: {
+      base: path.join(home, "Downloads"),
+      label: "Downloads",
+    },
+    projects: {
+      base: loadAllowlist().projectsRoot || "D:\\Projects",
+      label: "Projects",
+    },
+    cursor_projects: {
+      base: cursorProjectsRoot(),
+      label: "CursorProjects",
+    },
+    cursorprojects: {
+      base: cursorProjectsRoot(),
+      label: "CursorProjects",
+    },
+    cursor: {
+      base: cursorProjectsRoot(),
+      label: "CursorProjects",
+    },
+  };
+  // OneDrive Desktop redirect common on Windows
+  if (key === "desktop") {
+    const od = path.join(home, "OneDrive", "Desktop");
+    if (fs.existsSync(od)) return { base: od, label: "Desktop (OneDrive)" };
+  }
+  if (map[key]) return map[key]!;
+
+  // Drive root or path: D: / D:\ / D:\Foo / «диск D»
+  const driveOnly = raw.match(/^([a-zA-Z])\s*:?\s*$/);
+  const drivePath = raw.match(/^([a-zA-Z])\s*:[\\/]?(.*)$/);
+  if (driveOnly || drivePath) {
+    const letter = (driveOnly?.[1] || drivePath?.[1] || "D").toUpperCase();
+    const rest = (drivePath?.[2] || "").replace(/\//g, "\\").replace(/^\\+/, "");
+    const base = rest ? path.resolve(`${letter}:\\${rest}`) : path.resolve(`${letter}:\\`);
+    if (!isAllowedParentDir(base)) {
+      return { error: `Refused location «${raw}» — only user profile or D:–Z: data drives.` };
+    }
+    return { base, label: base };
+  }
+
+  // Absolute Windows path
+  if (/^[a-zA-Z]:[\\/]/.test(raw) || raw.startsWith("\\\\")) {
+    const base = path.resolve(raw);
+    if (!isAllowedParentDir(base)) {
+      return { error: `Refused path «${raw}».` };
+    }
+    return { base, label: base };
+  }
+
+  return {
+    error:
+      `Unknown location «${where}». Use: desktop | documents | downloads | projects | D:\\ | D:\\Folder`,
+  };
+}
+
+function sanitizeFolderName(name: string): string | null {
+  let n = String(name || "").trim();
+  n = n.replace(/[<>:"/\\|?*\u0000-\u001f]/g, "").replace(/\s+/g, " ").trim();
+  n = n.replace(/^\.+/, "").replace(/\.+$/, "");
+  if (!n || n === "." || n === "..") return null;
+  if (n.length > 80) n = n.slice(0, 80).trim();
+  return n;
+}
+
+/**
+ * Create an empty folder under an allowed parent (profile shortcuts or D:–Z: paths).
+ * `where` must be provided by the model from user intent — no silent Desktop default.
+ */
+export async function createFolder(opts: {
+  name: string;
+  where?: string;
+  open?: boolean;
+}): Promise<string> {
+  const name = sanitizeFolderName(opts.name);
+  if (!name) return "Refused: empty or invalid folder name.";
+  const where = String(opts.where || "").trim();
+  if (!where) {
+    return "Refused: where is required (infer drive/path from the user request).";
+  }
+  const loc = resolveFolderBase(where);
+  if ("error" in loc) return loc.error;
+  if (!fs.existsSync(loc.base)) {
+    try {
+      fs.mkdirSync(loc.base, { recursive: true });
+    } catch (e) {
+      return `Base folder missing and could not create ${loc.base}: ${(e as Error).message}`;
+    }
+  }
+  const abs = path.join(loc.base, name);
+  const resolved = path.resolve(abs);
+  const baseResolved = path.resolve(loc.base);
+  if (!resolved.toLowerCase().startsWith(baseResolved.toLowerCase() + path.sep) && resolved.toLowerCase() !== baseResolved.toLowerCase()) {
+    return "Refused: path escape blocked.";
+  }
+  try {
+    if (fs.existsSync(resolved)) {
+      const st = fs.statSync(resolved);
+      if (!st.isDirectory()) return `Exists but is not a folder: ${resolved}`;
+      if (opts.open !== false) {
+        spawn("explorer.exe", [resolved], { detached: true, stdio: "ignore" }).unref();
+      }
+      return `Already exists: ${resolved}`;
+    }
+    fs.mkdirSync(resolved, { recursive: false });
+  } catch (e) {
+    return `Create failed: ${(e as Error).message}`;
+  }
+  try {
+    const { bumpHabit } = await import("../memory/store");
+    bumpHabit({ intent: `mkdir:${name}` });
+  } catch {
+    /* optional */
+  }
+  if (opts.open !== false) {
+    spawn("explorer.exe", [resolved], { detached: true, stdio: "ignore" }).unref();
+  }
+  return `Created folder on ${loc.label}: ${resolved}`;
+}
+
 export async function listProjects(): Promise<string> {
   const root = loadAllowlist().projectsRoot;
   if (!fs.existsSync(root)) return `Projects root missing: ${root}`;
@@ -252,6 +400,9 @@ export async function gameMode(): Promise<string> {
  */
 export async function rebuildJarvis(restart = true): Promise<string> {
   const root = projectRoot();
+  const { opsBegin, opsEnd, opsProgress } = await import("../opsHud");
+  opsBegin("rebuild", "Сборка JARVIS", "tsc + static");
+  opsProgress("rebuild", 15, "TypeScript…");
   try {
     await execFileAsync("npx", ["tsc"], {
       cwd: root,
@@ -261,8 +412,10 @@ export async function rebuildJarvis(restart = true): Promise<string> {
     });
   } catch (e) {
     const err = e as { stderr?: string; message?: string };
+    opsEnd("rebuild", false, "tsc failed");
     return `Build failed (tsc): ${err.stderr || err.message || String(e)}`;
   }
+  opsProgress("rebuild", 55, "Копирование HUD…");
   try {
     await execFileAsync("node", ["scripts/copy-static.js"], {
       cwd: root,
@@ -271,10 +424,14 @@ export async function rebuildJarvis(restart = true): Promise<string> {
       shell: true,
     });
   } catch (e2) {
+    opsEnd("rebuild", false, "copy-static failed");
     return `tsc OK, but copy-static failed: ${(e2 as Error).message}`;
   }
 
+  opsProgress("rebuild", 90, restart ? "Готово — перезапуск…" : "Готово");
+
   if (!restart) {
+    opsEnd("rebuild", true);
     return "Build OK (tsc + static). Restart JARVIS later to load main-process changes.";
   }
 
@@ -282,12 +439,15 @@ export async function rebuildJarvis(restart = true): Promise<string> {
     "Пересобрать JARVIS уже готово. Перезапустить приложение сейчас, чтобы применить изменения?"
   );
   if (!ok) {
+    opsEnd("rebuild", true);
     return "Build OK. Restart cancelled — changes apply after you relaunch JARVIS.";
   }
 
   if (!restartRequest) {
+    opsEnd("rebuild", true);
     return "Build OK, but restart bridge missing — relaunch JARVIS manually.";
   }
+  opsEnd("rebuild", true);
   restartRequest();
   return "Build OK. Restarting JARVIS now…";
 }

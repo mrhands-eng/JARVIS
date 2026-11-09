@@ -212,6 +212,13 @@ export function isSttReady(): boolean {
   return ready;
 }
 
+/** idle = not requested; loading = weights downloading / pipeline init */
+export function sttLoadState(): "idle" | "loading" | "ready" {
+  if (ready) return "ready";
+  if (transcriberPromise) return "loading";
+  return "idle";
+}
+
 function emptyResult(
   partial: Partial<SttResult> & Pick<SttResult, "peak" | "rms" | "mean" | "durationSec" | "sampleRate">
 ): SttResult {

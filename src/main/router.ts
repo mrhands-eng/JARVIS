@@ -55,7 +55,7 @@ export async function tryLocalIntent(text: string): Promise<string | null> {
       const result = await openApp(app);
       if (result.startsWith("Launched")) {
         const label = app === "steam" ? "Steam" : app;
-        return `Запускаю ${label}, сэр.`;
+        return `Запускаю ${label}.`;
       }
       return result;
     }

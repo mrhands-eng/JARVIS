@@ -1,11 +1,11 @@
 :root {
-  --bg: rgba(5, 8, 15, 0.82);
-  --cyan: #00e5ff;
-  --cyan-dim: #007a8a;
-  --text: #e8f7ff;
-  --muted: #7a9bb0;
+  --bg: rgba(5, 12, 8, 0.82);
+  --cyan: #2effa0;
+  --cyan-dim: #0d8a52;
+  --text: #e8fff4;
+  --muted: #7ab09a;
   --danger: #ff3355;
-  --glow: rgba(0, 229, 255, 0.35);
+  --glow: rgba(46, 255, 160, 0.35);
   --font: "Segoe UI", "Consolas", system-ui, sans-serif;
 }
 
@@ -38,17 +38,155 @@ body {
   height: 100%;
   margin: 8px;
   padding: 14px;
-  border: 1px solid rgba(0, 229, 255, 0.35);
+  border: 1px solid rgba(46, 255, 160, 0.35);
   border-radius: 4px;
   background:
-    linear-gradient(180deg, rgba(0, 229, 255, 0.08), transparent 28%),
+    linear-gradient(180deg, rgba(46, 255, 160, 0.08), transparent 28%),
     var(--bg);
-  box-shadow: 0 0 24px var(--glow), inset 0 0 40px rgba(0, 229, 255, 0.05);
+  box-shadow: 0 0 24px var(--glow), inset 0 0 40px rgba(46, 255, 160, 0.05);
   display: flex;
   flex-direction: column;
   gap: 10px;
   backdrop-filter: blur(12px);
   -webkit-app-region: drag;
+}
+
+.hud-layout {
+  flex: 1;
+  min-height: 0;
+  display: flex;
+  gap: 10px;
+  -webkit-app-region: no-drag;
+}
+
+.hud-main {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+}
+
+.ops-rail {
+  width: 188px;
+  flex-shrink: 0;
+  border: 1px solid rgba(46, 255, 160, 0.22);
+  background: rgba(0, 0, 0, 0.28);
+  border-radius: 2px;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+  -webkit-app-region: no-drag;
+}
+
+.ops-rail.collapsed {
+  width: 34px;
+}
+
+.ops-rail.collapsed .ops-body,
+.ops-rail.collapsed .ops-title {
+  display: none;
+}
+
+.ops-rail.collapsed .ops-collapse {
+  transform: rotate(180deg);
+  margin: 4px auto;
+}
+
+.ops-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 8px;
+  border-bottom: 1px solid rgba(46, 255, 160, 0.12);
+}
+
+.ops-title {
+  font-size: 9px;
+  letter-spacing: 0.22em;
+  color: var(--cyan-dim);
+}
+
+.ops-collapse {
+  background: transparent;
+  border: 1px solid rgba(46, 255, 160, 0.25);
+  color: var(--muted);
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  line-height: 1;
+  cursor: pointer;
+  border-radius: 2px;
+}
+
+.ops-body {
+  flex: 1;
+  overflow: auto;
+  padding: 8px;
+  font-size: 10px;
+  line-height: 1.35;
+}
+
+.ops-section {
+  margin-bottom: 10px;
+}
+
+.ops-section h3 {
+  margin: 0 0 5px;
+  font-size: 9px;
+  letter-spacing: 0.14em;
+  color: var(--cyan-dim);
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.ops-row {
+  color: var(--muted);
+  margin-bottom: 3px;
+}
+
+.ops-row strong {
+  color: var(--text);
+  font-weight: 600;
+}
+
+.ops-bar {
+  height: 4px;
+  background: rgba(46, 255, 160, 0.12);
+  border-radius: 2px;
+  margin: 3px 0 6px;
+  overflow: hidden;
+}
+
+.ops-bar > i {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, var(--cyan-dim), var(--cyan));
+  border-radius: 2px;
+  transition: width 0.4s ease;
+}
+
+.ops-job {
+  padding: 4px 0;
+  border-bottom: 1px dashed rgba(46, 255, 160, 0.1);
+}
+
+.ops-job.running strong {
+  color: #ffe08a;
+}
+
+.ops-job.error strong {
+  color: var(--danger);
+}
+
+.ops-pill {
+  display: inline-block;
+  padding: 1px 5px;
+  border: 1px solid rgba(46, 255, 160, 0.25);
+  border-radius: 2px;
+  font-size: 9px;
+  color: var(--cyan);
 }
 
 .top {
@@ -67,7 +205,7 @@ body {
   width: 18px;
   height: 18px;
   border-radius: 50%;
-  background: radial-gradient(circle at 35% 35%, #fff, var(--cyan) 45%, #003844 80%);
+  background: radial-gradient(circle at 35% 35%, #fff, var(--cyan) 45%, #003828 80%);
   box-shadow: 0 0 12px var(--cyan);
   animation: pulse 2.4s ease-in-out infinite;
 }
@@ -122,8 +260,8 @@ body {
 .controls button,
 .composer button,
 .confirm-actions button {
-  background: rgba(0, 229, 255, 0.08);
-  border: 1px solid rgba(0, 229, 255, 0.35);
+  background: rgba(46, 255, 160, 0.08);
+  border: 1px solid rgba(46, 255, 160, 0.35);
   color: var(--text);
   border-radius: 2px;
   padding: 6px 10px;
@@ -133,7 +271,7 @@ body {
 .controls button:hover,
 .composer button:hover,
 .confirm-actions button:hover {
-  background: rgba(0, 229, 255, 0.18);
+  background: rgba(46, 255, 160, 0.18);
 }
 
 .brain-btn {
@@ -172,14 +310,177 @@ body {
   letter-spacing: 0.04em;
   min-width: 48px;
   font-weight: 600;
-  color: #c8e8ff;
-  border-color: rgba(0, 229, 255, 0.45) !important;
+  color: #c8ffe8;
+  border-color: rgba(46, 255, 160, 0.45) !important;
 }
 
-.log {
+.reminders-hud {
+  -webkit-app-region: no-drag;
+  border: 1px solid rgba(46, 255, 160, 0.22);
+  background: rgba(46, 255, 160, 0.06);
+  border-radius: 2px;
+  padding: 0;
+}
+
+.reminders-active.hidden {
+  display: none;
+}
+
+.timer-form {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 8px;
+  margin: 0;
+  border-bottom: 1px solid rgba(46, 255, 160, 0.1);
+}
+
+.timer-form-icon {
+  flex-shrink: 0;
+  font-size: 12px;
+  opacity: 0.85;
+}
+
+.timer-msg {
+  flex: 1 1 72px;
+  min-width: 48px;
+  max-width: 100%;
+  padding: 4px 6px;
+  font-size: 11px;
+  border: 1px solid rgba(46, 255, 160, 0.25);
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--text);
+}
+
+.timer-min {
+  width: 44px;
+  padding: 4px 4px;
+  font-size: 11px;
+  text-align: center;
+  border: 1px solid rgba(46, 255, 160, 0.25);
+  background: rgba(0, 0, 0, 0.35);
+  color: var(--text);
+}
+
+.timer-unit {
+  font-size: 10px;
+  color: var(--muted);
+  margin-right: 2px;
+}
+
+.timer-presets {
+  display: flex;
+  gap: 4px;
+}
+
+.timer-preset {
+  min-width: 28px;
+  padding: 3px 6px !important;
+  font-size: 10px !important;
+  line-height: 1.2;
+  border-color: rgba(46, 255, 160, 0.3) !important;
+  background: rgba(46, 255, 160, 0.08) !important;
+}
+
+.timer-preset:hover {
+  background: rgba(46, 255, 160, 0.2) !important;
+}
+
+.timer-go {
+  padding: 4px 10px !important;
+  font-size: 10px !important;
+  font-weight: 600;
+  color: #0a2014 !important;
+  background: var(--cyan) !important;
+  border-color: var(--cyan) !important;
+}
+
+.reminders-summary {
+  width: 100%;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border: none;
+  background: transparent;
+  color: var(--text);
+  font-size: 11px;
+  cursor: pointer;
+  text-align: left;
+}
+
+.reminders-summary:hover {
+  background: rgba(46, 255, 160, 0.1);
+}
+
+.reminders-icon {
+  flex-shrink: 0;
+  opacity: 0.9;
+}
+
+.reminders-summary-text {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.reminders-chevron {
+  flex-shrink: 0;
+  color: var(--muted);
+  font-size: 10px;
+}
+
+.reminders-list {
+  list-style: none;
+  margin: 0;
+  padding: 0 8px 6px;
+  border-top: 1px solid rgba(46, 255, 160, 0.12);
+}
+
+.reminders-list.hidden {
+  display: none;
+}
+
+.reminders-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 2px;
+  font-size: 10px;
+  color: var(--muted);
+}
+
+.reminders-item-main {
+  flex: 1;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.reminders-dismiss {
+  flex-shrink: 0;
+  width: 22px;
+  height: 22px;
+  padding: 0;
+  line-height: 1;
+  font-size: 14px;
+  color: #ffb3be;
+  border-color: rgba(255, 51, 85, 0.35) !important;
+  background: rgba(255, 51, 85, 0.08) !important;
+}
+
+.reminders-dismiss:hover {
+  background: rgba(255, 51, 85, 0.22) !important;
+}
+
+.hud-main > .log {
   flex: 1;
   overflow: auto;
-  border: 1px solid rgba(0, 229, 255, 0.15);
+  border: 1px solid rgba(46, 255, 160, 0.15);
   background: rgba(0, 0, 0, 0.25);
   padding: 10px;
   font-size: 12px;
@@ -206,8 +507,8 @@ body {
   font-size: 13px;
   line-height: 1.4;
   padding: 7px 10px;
-  border: 1px dashed rgba(0, 229, 255, 0.4);
-  background: rgba(0, 229, 255, 0.07);
+  border: 1px dashed rgba(46, 255, 160, 0.4);
+  background: rgba(46, 255, 160, 0.07);
   color: var(--text);
   min-height: 1.5em;
   border-radius: 2px;
@@ -221,7 +522,7 @@ body {
 }
 
 .live-voice.interim {
-  color: #b8ecf8;
+  color: #b8f8d8;
 }
 
 .composer {
@@ -238,7 +539,7 @@ body {
 .composer input {
   flex: 1;
   background: rgba(0, 0, 0, 0.35);
-  border: 1px solid rgba(0, 229, 255, 0.3);
+  border: 1px solid rgba(46, 255, 160, 0.3);
   color: var(--text);
   padding: 8px 10px;
   outline: none;

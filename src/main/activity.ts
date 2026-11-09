@@ -4,6 +4,7 @@ const VISIBLE_TOOLS = new Set([
   "open_app",
   "open_url",
   "open_project_path",
+  "create_folder",
   "list_projects",
   "system_status",
   "observe_pc",
@@ -65,6 +66,9 @@ export function humanActivity(name: string, status: string): string {
   if (n.includes("list_projects") || n.includes("open_project")) {
     return pick("Смотрю проекты…", "Проекты готовы");
   }
+  if (n.includes("create_folder") || n.includes("mkdir")) {
+    return pick("Создаю папку…", "Папка создана");
+  }
   if (n.includes("set_volume")) return pick("Кручу громкость…", "Громкость изменена");
   if (n.includes("focus_window") || n.includes("focus_workspace")) {
     return pick("Фокусирую окно…", "Окно на месте");
@@ -107,10 +111,10 @@ export function humanActivity(name: string, status: string): string {
 }
 
 export const ACK_PHRASES = [
-  "Секунду, сэр.",
-  "Сейчас посмотрю.",
-  "Один момент, сэр.",
+  "Секунду.",
+  "Сейчас.",
   "Принял.",
+  "Минуту.",
 ];
 
 export function randomAck(): string {
@@ -154,10 +158,6 @@ function daypartRu(hour: number): string {
 /** Short spoken line when the HUD finishes loading (respect mute in main). */
 export function startupGreeting(): string {
   const part = daypartRu(new Date().getHours());
-  const tails = [
-    "JARVIS в сети.",
-    "Системы онлайн.",
-    "К вашим услугам, сэр.",
-  ];
-  return `${part}, сэр. ${tails[Math.floor(Math.random() * tails.length)]!}`;
+  const tails = ["на связи.", "здесь.", "готов."];
+  return `${part} — ${tails[Math.floor(Math.random() * tails.length)]!}`;
 }

@@ -38,6 +38,10 @@ export async function runUserCommand(command: string): Promise<string> {
   const blocked = isBlockedCommand(cmd);
   if (blocked) return `Refused: ${blocked}`;
 
+  const { opsBegin, opsEnd } = await import("../opsHud");
+  const short = cmd.length > 48 ? `${cmd.slice(0, 45)}…` : cmd;
+  opsBegin("shell", "Команда на ПК", short);
+
   try {
     const { stdout, stderr } = await execFileAsync(
       "powershell.exe",
@@ -45,9 +49,11 @@ export async function runUserCommand(command: string): Promise<string> {
       { windowsHide: true, timeout: 45000, maxBuffer: 1024 * 512 }
     );
     const out = [stdout.trim(), stderr.trim()].filter(Boolean).join("\n");
+    opsEnd("shell", true);
     return out.slice(0, 4000) || "(no output)";
   } catch (e) {
     const err = e as { stdout?: string; stderr?: string; message?: string };
+    opsEnd("shell", false);
     return `Command failed: ${err.stderr || err.message || String(e)}\n${err.stdout || ""}`.slice(0, 4000);
   }
 }

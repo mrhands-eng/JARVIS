@@ -26,6 +26,32 @@
         </div>
       </header>
 
+      <div class="hud-layout">
+        <div class="hud-main">
+      <div id="remindersHud" class="reminders-hud" aria-live="polite">
+        <form id="timerForm" class="timer-form" title="Таймер / напоминание">
+          <span class="timer-form-icon">⏱</span>
+          <input id="timerMsg" type="text" class="timer-msg" placeholder="Текст…" maxlength="120" autocomplete="off" />
+          <input id="timerMin" type="number" class="timer-min" min="1" max="2880" value="5" title="Минуты" aria-label="Минуты" />
+          <span class="timer-unit">мин</span>
+          <div class="timer-presets">
+            <button type="button" class="timer-preset" data-min="5">5</button>
+            <button type="button" class="timer-preset" data-min="10">10</button>
+            <button type="button" class="timer-preset" data-min="15">15</button>
+            <button type="button" class="timer-preset" data-min="30">30</button>
+          </div>
+          <button type="submit" class="timer-go">Старт</button>
+        </form>
+        <div id="remindersActive" class="reminders-active hidden">
+          <button type="button" id="remindersToggle" class="reminders-summary" title="Ближайшие напоминания — развернуть">
+            <span class="reminders-icon">⏰</span>
+            <span id="remindersSummaryText" class="reminders-summary-text"></span>
+            <span id="remindersChevron" class="reminders-chevron">▾</span>
+          </button>
+          <ul id="remindersList" class="reminders-list hidden"></ul>
+        </div>
+      </div>
+
       <div id="log" class="log"></div>
 
       <div id="confirm" class="confirm hidden">
@@ -44,6 +70,16 @@
         <button type="submit">Send</button>
       </form>
       <footer class="foot">Stark OS · STOP = Ctrl+Shift+X · Ctrl+Shift+H = HUD</footer>
+        </div>
+
+        <aside id="opsRail" class="ops-rail" aria-label="Системные операции">
+          <div class="ops-head">
+            <span class="ops-title">СИСТЕМА</span>
+            <button type="button" id="opsCollapse" class="ops-collapse" title="Свернуть панель">◂</button>
+          </div>
+          <div id="opsBody" class="ops-body"></div>
+        </aside>
+      </div>
     </div>
     <script src="app.js"></script>
   </body>

@@ -68,5 +68,6 @@
     }
   },
   "projectsRoot": "D:\\Projects",
+  "cursorProjectsRoot": "D:\\Projects\\CursorProjects",
   "gameModeClose": ["Discord", "zen", "Telegram", "chrome", "msedge"]
 }

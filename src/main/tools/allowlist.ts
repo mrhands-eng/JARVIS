@@ -10,8 +10,16 @@ export type AppEntry = {
 export type Allowlist = {
   apps: Record<string, AppEntry>;
   projectsRoot: string;
+  /** Cursor/IDE project repos — usually projectsRoot\\CursorProjects */
+  cursorProjectsRoot?: string;
   gameModeClose: string[];
 };
+
+export function cursorProjectsRoot(): string {
+  const list = loadAllowlist();
+  if (list.cursorProjectsRoot) return list.cursorProjectsRoot;
+  return path.join(list.projectsRoot || "D:\\Projects", "CursorProjects");
+}
 
 let cached: Allowlist | null = null;
 

@@ -8,7 +8,7 @@ import { logError, logInfo } from "../logger";
 import { projectRoot } from "../tools/allowlist";
 
 type VoiceConfig = {
-  provider: "edge" | "elevenlabs";
+  provider: "edge" | "elevenlabs" | "piper";
   edge: {
     voiceEn: string;
     voiceRu: string;
@@ -20,6 +20,11 @@ type VoiceConfig = {
   elevenlabs: {
     voiceId: string;
     modelId: string;
+  };
+  piper?: {
+    exe?: string;
+    modelEn?: string;
+    modelRu?: string;
   };
   maxChars: number;
   chunkSize?: number;
@@ -185,6 +190,57 @@ async function synthesizeEdgeChunk(text: string, voice: string, cfg: VoiceConfig
   throw lastError instanceof Error ? lastError : new Error(String(lastError));
 }
 
+function piperPaths(cfg: VoiceConfig): { exe: string; modelEn: string; modelRu: string } {
+  const root = projectRoot();
+  const dir = path.join(root, "data", "voice", "piper");
+  return {
+    exe: cfg.piper?.exe || path.join(dir, "piper", "piper.exe"),
+    modelEn: cfg.piper?.modelEn || path.join(dir, "en_GB-northern_english_male-medium.onnx"),
+    modelRu: cfg.piper?.modelRu || path.join(dir, "ru_RU-ruslan-medium.onnx"),
+  };
+}
+
+function piperReady(cfg: VoiceConfig): boolean {
+  const p = piperPaths(cfg);
+  return fs.existsSync(p.exe) && (fs.existsSync(p.modelEn) || fs.existsSync(p.modelRu));
+}
+
+function pickPiperModel(cfg: VoiceConfig, text: string): string {
+  const p = piperPaths(cfg);
+  const voice = pickVoice(cfg, text);
+  const ru = voice.startsWith("ru");
+  const preferred = ru ? p.modelRu : p.modelEn;
+  const fallback = ru ? p.modelEn : p.modelRu;
+  if (fs.existsSync(preferred)) return preferred;
+  if (fs.existsSync(fallback)) return fallback;
+  throw new Error("Piper model not found — run scripts/setup-piper.ps1");
+}
+
+async function synthesizePiper(text: string, cfg: VoiceConfig): Promise<Buffer> {
+  const exe = piperPaths(cfg).exe;
+  const model = pickPiperModel(cfg, text);
+  return new Promise((resolve, reject) => {
+    const child = spawn(exe, ["--model", model, "--output_file", "-"], {
+      windowsHide: true,
+      stdio: ["pipe", "pipe", "pipe"],
+    });
+    const chunks: Buffer[] = [];
+    child.stdout.on("data", (c: Buffer) => chunks.push(c));
+    child.stderr.on("data", () => {});
+    child.on("error", reject);
+    child.on("close", (code) => {
+      const buf = Buffer.concat(chunks);
+      if (code !== 0 || buf.length < 256) {
+        reject(new Error(`Piper exit ${code}, ${buf.length} bytes`));
+        return;
+      }
+      resolve(buf);
+    });
+    child.stdin.write(text);
+    child.stdin.end();
+  });
+}
+
 async function synthesizeElevenLabs(text: string, cfg: VoiceConfig): Promise<Buffer> {
   const key = process.env.ELEVENLABS_API_KEY;
   const voiceId = process.env.ELEVENLABS_VOICE_ID || cfg.elevenlabs.voiceId;
@@ -248,13 +304,41 @@ try {
   await runPsScript(script, mySeq);
 }
 
-async function playMp3(audio: Buffer, queue: boolean, mySeq: number): Promise<void> {
+async function playAudioBuf(
+  audio: Buffer,
+  mime: string,
+  queue: boolean,
+  mySeq: number
+): Promise<void> {
   if (mySeq !== speakSeq) return;
   if (!playFn) {
-    await playViaWindows(audio, mySeq);
+    if (mime === "audio/mpeg") await playViaWindows(audio, mySeq);
+    else await playViaWindowsWav(audio, mySeq);
     return;
   }
-  playFn({ mime: "audio/mpeg", base64: audio.toString("base64"), queue, seq: mySeq });
+  playFn({ mime, base64: audio.toString("base64"), queue, seq: mySeq });
+}
+
+async function synthesizeChunk(chunk: string, cfg: VoiceConfig, voice: string): Promise<{ buf: Buffer; mime: string }> {
+  const preferEleven =
+    (cfg.provider === "elevenlabs" || !!process.env.ELEVENLABS_API_KEY) &&
+    !!(process.env.ELEVENLABS_VOICE_ID || cfg.elevenlabs.voiceId) &&
+    !!process.env.ELEVENLABS_API_KEY;
+
+  if (cfg.provider === "piper" && piperReady(cfg)) {
+    const buf = await synthesizePiper(chunk, cfg);
+    return { buf, mime: "audio/wav" };
+  }
+  if (preferEleven) {
+    try {
+      const buf = await synthesizeElevenLabs(chunk, cfg);
+      return { buf, mime: "audio/mpeg" };
+    } catch {
+      /* fall through to Edge */
+    }
+  }
+  const buf = await synthesizeEdgeChunk(chunk, voice, cfg);
+  return { buf, mime: "audio/mpeg" };
 }
 
 /** Neural JARVIS TTS — one locked voice for the whole reply (no mid-message timbre swap). */
@@ -267,47 +351,57 @@ export async function speak(text: string): Promise<void> {
   killPsChild();
   stopFn?.(speakSeq);
 
-  const preferEleven =
-    (cfg.provider === "elevenlabs" || !!process.env.ELEVENLABS_API_KEY) &&
-    !!(process.env.ELEVENLABS_VOICE_ID || cfg.elevenlabs.voiceId) &&
-    !!process.env.ELEVENLABS_API_KEY;
-
   const voice = pickVoice(cfg, cleaned);
-  const chunks = splitChunks(cleaned, cfg.chunkSize || 320);
+  const chunks = splitChunks(cleaned, cfg.chunkSize || 280);
 
-  try {
-    let first = true;
-    let played = false;
-    for (const chunk of chunks) {
+  let first = true;
+  let played = false;
+  for (const chunk of chunks) {
+    if (mySeq !== speakSeq) return;
+    try {
+      const { buf, mime } = await synthesizeChunk(chunk, cfg, voice);
       if (mySeq !== speakSeq) return;
-      let audio: Buffer;
-      if (preferEleven) {
-        try {
-          audio = await synthesizeElevenLabs(chunk, cfg);
-        } catch {
-          audio = await synthesizeEdgeChunk(chunk, voice, cfg);
-        }
-      } else {
-        audio = await synthesizeEdgeChunk(chunk, voice, cfg);
-      }
-      if (mySeq !== speakSeq) return;
-      await playMp3(audio, !first, mySeq);
-      if (mySeq !== speakSeq) return;
+      await playAudioBuf(buf, mime, !first, mySeq);
       first = false;
       played = true;
-    }
-    if (played) logInfo("tts", `ok voice=${voice} chunks=${chunks.length}`);
-  } catch (err) {
-    if (mySeq !== speakSeq) return;
-    logError("tts.synthesize", err);
-    // Last resort: local Windows voice so greetings are never silent
-    try {
-      logInfo("tts", "falling back to Windows SAPI");
-      await speakViaWindowsSapi(cleaned, mySeq);
-    } catch (e2) {
-      logError("tts.sapi", e2);
+    } catch (err) {
+      if (mySeq !== speakSeq) return;
+      logError("tts.chunk", err);
+      logInfo("tts", "chunk fallback Windows SAPI");
+      try {
+        await speakViaWindowsSapi(chunk, mySeq);
+        played = true;
+      } catch (e2) {
+        logError("tts.sapi", e2);
+      }
     }
   }
+  if (played) logInfo("tts", `ok provider=${cfg.provider} voice=${voice} chunks=${chunks.length}`);
+}
+
+async function playViaWindowsWav(wav: Buffer, mySeq: number): Promise<void> {
+  if (mySeq !== speakSeq) return;
+  const file = path.join(os.tmpdir(), `stark-tts-${Date.now()}.wav`);
+  fs.writeFileSync(file, wav);
+  const uri = "file:///" + file.replace(/\\/g, "/");
+  const script = `
+Add-Type -AssemblyName PresentationCore
+$m = New-Object System.Windows.Media.MediaPlayer
+$m.Open([Uri]'${uri.replace(/'/g, "''")}')
+$m.Volume = 1
+$sw = [Diagnostics.Stopwatch]::StartNew()
+while (-not $m.NaturalDuration.HasTimeSpan) {
+  Start-Sleep -Milliseconds 50
+  if ($sw.Elapsed.TotalSeconds -gt 8) { break }
+}
+$m.Play()
+if ($m.NaturalDuration.HasTimeSpan) {
+  Start-Sleep -Milliseconds ([int]$m.NaturalDuration.TimeSpan.TotalMilliseconds + 200)
+}
+$m.Close()
+Remove-Item -LiteralPath '${file.replace(/'/g, "''")}' -Force -ErrorAction SilentlyContinue
+`;
+  await runPsScript(script, mySeq);
 }
 
 async function playViaWindows(mp3: Buffer, mySeq: number): Promise<void> {

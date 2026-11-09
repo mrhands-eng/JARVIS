@@ -46,7 +46,7 @@ function normalizeUserText(text: string): string {
  */
 export async function askLocalJarvis(userText: string, emit: Emit): Promise<string> {
   const prompt = normalizeUserText(userText);
-  if (!prompt) return "Слушаю, сэр.";
+  if (!prompt) return "Слушаю.";
 
   beginTask();
   ensureMemorySeeded();
@@ -80,12 +80,15 @@ export async function askLocalJarvis(userText: string, emit: Emit): Promise<stri
       standingOrders(),
       "",
       "LOCAL MODE: Cursor cloud is unavailable or offline. You run on Ollama on this PC.",
-      "You still have PC tools (open_app, open_url, memory_*, see_screen, system_status, …).",
+      "You still have PC tools (open_app, open_url, create_folder, memory_*, see_screen, system_status, run_command, …).",
       "File-edit/self-heal via Cursor agent tools is limited — prefer PC tools + memory.",
-      "Answer in the user's language. Be JARVIS.",
+      "Never claim a PC action without a successful tool result.",
+      "Infer intent; pick tools/args yourself.",
+      "VOICE: brief, natural, human — one short sentence by default. No filler, no closers, no tour-guide tips.",
+      "User's language. Be JARVIS.",
       casual
-        ? "CASUAL TURN: one short natural sentence. No capability pitch. No tools."
-        : "Call see_screen when you need to know what is on the monitor (OCR + windows).",
+        ? "CASUAL: one natural short line. No tools."
+        : "see_screen if you need the monitor.",
       "",
       casual ? "" : memoryDossier(900),
       "",
@@ -108,7 +111,7 @@ export async function askLocalJarvis(userText: string, emit: Emit): Promise<stri
               "User said:",
               prompt,
               "",
-              "Continue this dialog. Current + previous dialog context is in the system message.",
+              "Continue this dialog. Infer intent; call tools with the right args. Context is in the system message.",
             ].join("\n"),
       },
     ];
@@ -116,6 +119,7 @@ export async function askLocalJarvis(userText: string, emit: Emit): Promise<stri
     let finalText = "";
     let usedTool = false;
     const maxSteps = casual ? 1 : 8;
+    let fakeActionNudge = 0;
 
     for (let step = 0; step < maxSteps; step++) {
       throwIfCancelled();
@@ -160,6 +164,27 @@ export async function askLocalJarvis(userText: string, emit: Emit): Promise<stri
       }
 
       finalText = (msg.content || "").trim();
+      // Qwen often claims PC actions without tools — force one retry with create_folder etc.
+      if (
+        finalText &&
+        !usedTool &&
+        !casual &&
+        fakeActionNudge < 1 &&
+        /(создал|создана|папк[ауеи]|folder|mkdir|удалил|открыл|запустил|сохранил)/i.test(finalText)
+      ) {
+        fakeActionNudge += 1;
+        logInfo("localBrain", "fake-action reply without tools — nudging");
+        emit({ type: "tool", name: "Нужен реальный инструмент…", status: "running" });
+        messages.push({
+          role: "user",
+          content:
+            "STOP. You claimed a PC action but called no tools. " +
+            "Call create_folder / open_app / open_url / run_command / see_screen now. " +
+            "Do not answer in prose until a tool returns success.",
+        });
+        finalText = "";
+        continue;
+      }
       if (finalText) {
         emit({ type: "delta", text: finalText });
         break;
@@ -167,11 +192,7 @@ export async function askLocalJarvis(userText: string, emit: Emit): Promise<stri
     }
 
     if (!finalText) {
-      finalText = usedTool ? "Готово, сэр. (локальный режим)" : "Не разобрал запрос в локальном режиме.";
-    }
-
-    if (!/\(local ·/i.test(finalText)) {
-      finalText = `${finalText}\n\n(local · ${model})`;
+      finalText = usedTool ? "Готово." : "Не понял — скажи иначе.";
     }
 
     try {
@@ -185,7 +206,7 @@ export async function askLocalJarvis(userText: string, emit: Emit): Promise<stri
     return finalText;
   } catch (e) {
     if (isCancelError(e)) {
-      const nice = "Остановлено, сэр.";
+      const nice = "Остановил.";
       emit({ type: "final", text: nice });
       emit({ type: "status", status: "idle", detail: "stopped" });
       return nice;

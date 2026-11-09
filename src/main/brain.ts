@@ -253,7 +253,7 @@ export async function askJarvis(userText: string): Promise<string> {
   try {
     emit({ type: "status", status: "thinking", detail: "Cursor…" });
     const answer = await call("ask", { text: userText }, 180000);
-    if (isCancelError(answer) || /^Остановлено/i.test(answer)) return answer;
+    if (isCancelError(answer) || /^Остановил/i.test(answer)) return answer;
     if (cfg.preferLocalWhenCursorFails && looksLikeCursorFailure(answer)) {
       logInfo(
         "brain-bridge",
@@ -268,7 +268,7 @@ export async function askJarvis(userText: string): Promise<string> {
   } catch (e) {
     if (isCancelError(e)) {
       emit({ type: "status", status: "idle", detail: "stopped" });
-      return "Остановлено, сэр.";
+      return "Остановил.";
     }
     logError("brain-bridge.ask", e);
     forceLocalUntil = Date.now() + 5 * 60_000;
@@ -312,7 +312,7 @@ export async function stopJarvis(): Promise<string> {
   }
 
   emit({ type: "status", status: "idle", detail: "stopped" });
-  return "Остановлено, сэр.";
+  return "Остановил.";
 }
 
 export async function disposeBrain(): Promise<void> {

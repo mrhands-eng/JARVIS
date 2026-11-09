@@ -5,6 +5,7 @@ import {
   getSystemStatus,
   listProjects,
   minimizeOthersKeep,
+  createFolder,
   openApp,
   openPath,
   openUrl,
@@ -250,6 +251,45 @@ export function buildCustomTools(): Record<string, SDKCustomTool> {
       },
       execute: safe(async (args) => openPath(String(args.path ?? ""))),
     },
+    create_folder: {
+      description:
+        "Create a real folder. Infer name + parent from the user's request (any phrasing). " +
+        "where shortcuts: desktop, documents, downloads, projects (=D:\\\\Projects), " +
+        "cursor_projects (=D:\\\\Projects\\\\CursorProjects — Cursor/IDE repos). " +
+        "Or pass an absolute path/drive (D:\\\\, D:\\\\Games). " +
+        "If they mean Cursor project folders, use cursor_projects — not projects. Never invent success.",
+      annotations: { title: "Create folder" },
+      inputSchema: {
+        type: "object",
+        properties: {
+          name: {
+            type: "string",
+            description: "Folder name only (not full path) — inferred from the request",
+          },
+          where: {
+            type: "string",
+            description:
+              "Parent shortcut or path: desktop|documents|downloads|projects|cursor_projects|D:\\\\|D:\\\\Subdir",
+          },
+          open: {
+            type: "boolean",
+            description: "Open in Explorer after create (default true)",
+          },
+        },
+        required: ["name", "where"],
+      },
+      execute: safe(async (args) => {
+        const where = String(args.where ?? "").trim();
+        if (!where) {
+          return "Refused: where is required. Infer parent path/drive from the user request, then retry.";
+        }
+        return createFolder({
+          name: String(args.name ?? ""),
+          where,
+          open: args.open === undefined ? true : !!args.open,
+        });
+      }),
+    },
     list_projects: {
       description: "List project folders under D:\\Projects.",
       annotations: { readOnlyHint: true, title: "List projects" },
@@ -354,14 +394,29 @@ export function buildCustomTools(): Record<string, SDKCustomTool> {
         "Schedule a one-shot reminder while JARVIS is running (tray counts). " +
         "When it fires: posts to HUD chat and shows a Windows notification if HUD is hidden or unfocused. " +
         "Stale/missed rows are pruned on schedule, list, and fire. " +
+        "For «на 21:41» / clock time use at_time (and on_date for explicit calendar day). " +
+        "If only at_time and that clock today is past, fires next calendar day. " +
         "Prefer this over run_command/schtasks for «напомни через …».",
       annotations: { title: "Schedule reminder" },
       inputSchema: {
         type: "object",
         properties: {
           message: { type: "string", description: "What to remind the user about" },
-          in_minutes: { type: "number", description: "Delay in minutes (e.g. 60)" },
-          in_seconds: { type: "number", description: "Delay in seconds (for quick tests)" },
+          at_time: {
+            type: "string",
+            description: "Local clock HH:MM or HH:MM:SS (e.g. 22:16). Pair with on_date when user names a day.",
+          },
+          on_date: {
+            type: "string",
+            description:
+              "Calendar day: YYYY-MM-DD, DD.MM.YYYY, «сегодня», «завтра». Omit with at_time to mean today or roll to tomorrow if past.",
+          },
+          fire_at_iso: {
+            type: "string",
+            description: "Full ISO 8601 local/offset datetime when you already computed an absolute instant",
+          },
+          in_minutes: { type: "number", description: "Relative delay in minutes (e.g. 60)" },
+          in_seconds: { type: "number", description: "Relative delay in seconds (quick tests)" },
         },
         required: ["message"],
       },
@@ -371,7 +426,17 @@ export function buildCustomTools(): Record<string, SDKCustomTool> {
           args.in_minutes !== undefined ? Number(args.in_minutes) : undefined;
         const inSeconds =
           args.in_seconds !== undefined ? Number(args.in_seconds) : undefined;
-        return scheduleReminder(msg, { inMinutes, inSeconds });
+        const atTime = args.at_time !== undefined ? String(args.at_time) : undefined;
+        const onDate = args.on_date !== undefined ? String(args.on_date) : undefined;
+        const fireAtIso =
+          args.fire_at_iso !== undefined ? String(args.fire_at_iso) : undefined;
+        return scheduleReminder(msg, {
+          inMinutes,
+          inSeconds,
+          atTime,
+          onDate,
+          fireAtIso,
+        });
       }),
     },
     rebuild_jarvis: {

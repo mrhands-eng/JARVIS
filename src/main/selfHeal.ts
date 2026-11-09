@@ -114,7 +114,7 @@ export async function reportJarvisFault(opts: {
   if (Date.now() - lastHealAt < COOLDOWN_MS) {
     logInfo("selfHeal", "cooldown — skip auto fix");
     if (!(mutedFn?.() ?? true) && speakFn) {
-      void speakFn("Недавно уже чинился, сэр. Подождите минуту.").catch(() => undefined);
+      void speakFn("Недавно уже чинился — минуту подожди.").catch(() => undefined);
     }
     return;
   }
@@ -135,7 +135,7 @@ export async function reportJarvisFault(opts: {
     "1) Locate the failing code (src/main, src/renderer, config, voice/stt, etc.).",
     "2) Apply a minimal correct patch (follow existing patterns).",
     "3) Call rebuild_jarvis with restart=true so changes load (auto-confirmed during heal).",
-    "4) Reply in Russian, 2–4 short sentences: what broke and what you fixed.",
+    "4) Reply in Russian, 1–2 short natural sentences: what broke and what you fixed. No filler.",
     "Do not ask the user what to do. Do not disable safety gates for Defender/UAC.",
   ].join("\n");
 

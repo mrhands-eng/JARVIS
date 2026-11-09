@@ -83,4 +83,23 @@ contextBridge.exposeInMainWorld("jarvis", {
     ipcRenderer.on("reminder", handler);
     return () => ipcRenderer.removeListener("reminder", handler);
   },
+  getReminders: () =>
+    ipcRenderer.invoke("get-reminders") as Promise<
+      { id: string; message: string; fireAt: number }[]
+    >,
+  cancelReminderId: (id: string) =>
+    ipcRenderer.invoke("cancel-reminder-id", id) as Promise<string>,
+  scheduleReminderHud: (payload: { message?: string; inMinutes?: number; inSeconds?: number }) =>
+    ipcRenderer.invoke("schedule-reminder-hud", payload) as Promise<string>,
+  onRemindersChanged: (cb: () => void) => {
+    const handler = () => cb();
+    ipcRenderer.on("reminders-changed", handler);
+    return () => ipcRenderer.removeListener("reminders-changed", handler);
+  },
+  getOpsSnapshot: () => ipcRenderer.invoke("get-ops-snapshot"),
+  onOpsChanged: (cb: () => void) => {
+    const handler = () => cb();
+    ipcRenderer.on("ops-changed", handler);
+    return () => ipcRenderer.removeListener("ops-changed", handler);
+  },
 });

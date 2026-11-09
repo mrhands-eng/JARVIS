@@ -14,6 +14,8 @@ data/logs/
 # JARVIS-only Ollama models (not shared with the rest of the PC)
 data/ollama/
 data/brain-mode.json
+# Piper TTS binaries + voice models (install via scripts/setup-piper.ps1)
+data/voice/
 # Runtime reminders + one-off schtasks test scripts
 data/reminders.json
 data/*.ps1

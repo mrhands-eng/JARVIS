@@ -35,7 +35,14 @@ import { beginDialogSession, rollCurrentIntoSummary } from "./memory/dialog";
 import { isSttReady, transcribeWavBuffer, type SttResult } from "./voice/stt";
 import { setAudioHandlers, speak, stopSpeaking } from "./voice/tts";
 import { logError, logInfo } from "./logger";
-import { configureReminders } from "./reminders";
+import {
+  cancelReminder,
+  configureReminders,
+  getRemindersSnapshot,
+  scheduleReminder,
+} from "./reminders";
+import { configureOpsHud, getOpsSnapshot, startOpsHudPolling, touchOpsHud } from "./opsHud";
+import { startMobileBridge, stopMobileBridge } from "./mobileBridge";
 
 let win: BrowserWindow | null = null;
 let tray: Tray | null = null;
@@ -57,9 +64,9 @@ function createWindow(): void {
   const display = screen.getPrimaryDisplay().workAreaSize;
   const idle = loadIdleConfig();
   win = new BrowserWindow({
-    width: 420,
+    width: 640,
     height: 520,
-    x: display.width - 440,
+    x: Math.max(20, display.width - 660),
     y: 40,
     frame: false,
     transparent: true,
@@ -163,7 +170,13 @@ function registerIpc(): void {
     hudFocused: () => !!win?.isFocused(),
     speak,
     isMuted: () => muted,
+    onRemindersChanged: () => win?.webContents.send("reminders-changed"),
   });
+
+  configureOpsHud({
+    onChange: () => win?.webContents.send("ops-changed"),
+  });
+  startOpsHudPolling(1800);
 
   configureSelfHeal({
     speak,
@@ -229,6 +242,7 @@ function registerIpc(): void {
   ipcMain.handle("ask-text", async (_e, text: string) => {
     noteActivity("ask");
     const raw = String(text ?? "");
+    touchOpsHud();
     const casual = isCasualTurn(raw);
     if (casual) {
       // No “Уже занимаюсь” theatre for hellos — only a quiet HUD pulse
@@ -257,7 +271,7 @@ function registerIpc(): void {
         status: "thinking",
         detail: "Ещё работаю…",
       });
-      void speak("Ещё работаю, сэр.").catch((e) => logError("tts.keepalive", e));
+      void speak("Ещё работаю.").catch((e) => logError("tts.keepalive", e));
     }, 12000);
     try {
       const answer = await askJarvis(raw);
@@ -295,6 +309,31 @@ function registerIpc(): void {
     return true;
   });
 
+  ipcMain.handle("get-reminders", () => getRemindersSnapshot());
+
+  ipcMain.handle("get-ops-snapshot", () => getOpsSnapshot());
+
+  ipcMain.handle("cancel-reminder-id", (_e, id: string) =>
+    cancelReminder({ id: String(id ?? "") })
+  );
+
+  ipcMain.handle(
+    "schedule-reminder-hud",
+    (
+      _e,
+      payload: { message?: string; inMinutes?: number; inSeconds?: number }
+    ) => {
+      const message = String(payload?.message ?? "").trim() || "Таймер";
+      if (payload?.inSeconds != null && Number.isFinite(payload.inSeconds)) {
+        return scheduleReminder(message, { inSeconds: Number(payload.inSeconds) });
+      }
+      if (payload?.inMinutes != null && Number.isFinite(payload.inMinutes)) {
+        return scheduleReminder(message, { inMinutes: Number(payload.inMinutes) });
+      }
+      return "Укажите длительность (минуты).";
+    }
+  );
+
   ipcMain.handle("stop-task", async () => {
     stopSpeaking();
     confirmResolver?.(false);
@@ -303,7 +342,7 @@ function registerIpc(): void {
     const msg = await stopJarvis();
     win?.webContents.send("brain-event", {
       type: "tool",
-      name: "Остановлено",
+      name: "Остановил",
       status: "completed",
     });
     if (!muted) {
@@ -382,6 +421,7 @@ function registerIpc(): void {
 
   onBrainEvent((ev) => {
     win?.webContents.send("brain-event", ev);
+    if (ev.type === "tool" || ev.type === "status") touchOpsHud();
   });
 }
 
@@ -487,6 +527,7 @@ if (!gotLock) {
       ])
     );
     registerIpc();
+    startMobileBridge();
     beginDialogSession();
     createWindow();
     scheduleStartupGreeting();
@@ -504,6 +545,7 @@ if (!gotLock) {
   });
 
   app.on("will-quit", () => {
+    stopMobileBridge();
     try {
       rollCurrentIntoSummary("app-quit");
     } catch {

@@ -31,15 +31,22 @@ npm run disable-startup
 ```
 
 ### Voice (AI TTS)
-Default: **Microsoft Edge neural** — British `en-GB-RyanNeural` (JARVIS-like) / Russian `ru-RU-DmitryNeural`.
-Tune in `config/voice.json` (`rate`, `pitch`, voice names).
+Default: **Microsoft Edge neural** — `en-GB-RyanNeural` (British, JARVIS-ish) / `ru-RU-DmitryNeural`. In `config/voice.json`, `lockVoice` forces one timbre for mixed RU/EN replies.
 
-Optional cinematic voice via ElevenLabs — set in `.env`:
+Long answers are split into chunks. If Edge drops the socket (common with VPN), older builds fell back to **robotic Windows SAPI for the whole message** — now each chunk is neural-first; SAPI is per-chunk only.
+
+**Offline / local AI voice (Piper):**
+```powershell
+powershell -ExecutionPolicy Bypass -File scripts/setup-piper.ps1
+```
+Then set `"provider": "piper"` in `config/voice.json` and rebuild. Models: British male + Russian `ruslan`.
+
+**Cinematic cloud clone (ElevenLabs)** — best “movie JARVIS”; set in `.env`:
 ```
 ELEVENLABS_API_KEY=...
 ELEVENLABS_VOICE_ID=...
 ```
-and/or `"provider": "elevenlabs"` in `config/voice.json`.
+and `"provider": "elevenlabs"`.
 
 ### Natural language
 Ask in plain Russian/English — no fixed command phrases. Examples:

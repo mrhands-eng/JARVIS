@@ -1,14 +1,14 @@
 {
-  "name": "Stark Arc",
-  "background": "#05080F",
-  "surface": "#0A1220",
-  "cyan": "#00E5FF",
-  "cyanDim": "#007A8A",
+  "name": "Stark Green",
+  "background": "#050F08",
+  "surface": "#0A2014",
+  "cyan": "#2EFFA0",
+  "cyanDim": "#0D8A52",
   "red": "#C41E3A",
   "gold": "#C9A227",
-  "text": "#E8F7FF",
-  "muted": "#7A9BB0",
-  "glow": "rgba(0, 229, 255, 0.45)",
+  "text": "#E8FFF4",
+  "muted": "#7AB09A",
+  "glow": "rgba(46, 255, 160, 0.45)",
   "danger": "#FF3355",
   "ok": "#2EFFA0"
 }

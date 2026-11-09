@@ -21,6 +21,15 @@
   const confirmText = document.getElementById("confirmText");
   const hud = document.getElementById("hud");
   const liveVoiceEl = document.getElementById("liveVoice");
+  const remindersHud = document.getElementById("remindersHud");
+  const remindersActive = document.getElementById("remindersActive");
+  const timerForm = document.getElementById("timerForm");
+  const timerMsg = document.getElementById("timerMsg");
+  const timerMin = document.getElementById("timerMin");
+  const remindersToggle = document.getElementById("remindersToggle");
+  const remindersSummaryText = document.getElementById("remindersSummaryText");
+  const remindersChevron = document.getElementById("remindersChevron");
+  const remindersList = document.getElementById("remindersList");
   const INPUT_PH = "Ask JARVIS… (Ctrl+Shift+J = voice)";
 
   let muted = false;
@@ -49,6 +58,242 @@
   const MAX_LISTEN_MS = 12000;
   const LIVE_STT_MS = 1500;
   const LIVE_STT_MIN_PEAK = 0.003;
+  let remindersExpanded = false;
+  let remindersCache = [];
+  let remindersTick = null;
+  const opsRail = document.getElementById("opsRail");
+  const opsBody = document.getElementById("opsBody");
+  const opsCollapse = document.getElementById("opsCollapse");
+  let opsCollapsed = false;
+
+  function formatMb(bytes) {
+    const n = Number(bytes) || 0;
+    if (n < 1_000_000) return `${Math.round(n / 1024)} КБ`;
+    return `${(n / 1_000_000).toFixed(1)} МБ`;
+  }
+
+  function pctBar(pct) {
+    const p = Math.max(0, Math.min(100, Number(pct) || 0));
+    return `<div class="ops-bar"><i style="width:${p}%"></i></div>`;
+  }
+
+  function renderOpsPanel(snap) {
+    if (!opsBody || !snap) return;
+    const parts = [];
+
+    parts.push('<div class="ops-section"><h3>ПК</h3>');
+    parts.push(
+      `<div class="ops-row">RAM <strong>${snap.ramUsedPct}%</strong> · свободно ${snap.ramFreeGb} ГБ</div>`
+    );
+    parts.push(`<div class="ops-row">Аптайм <strong>${snap.uptimeMin}</strong> мин</div>`);
+    parts.push(
+      `<div class="ops-row">Мозг <span class="ops-pill">${snap.brainMode === "local" ? "LOCAL" : "CURSOR"}</span></div>`
+    );
+    if (snap.selfHealing) {
+      parts.push('<div class="ops-row"><strong style="color:#ffe08a">Самолечение</strong></div>');
+    }
+    parts.push("</div>");
+
+    parts.push('<div class="ops-section"><h3>Голос / STT</h3>');
+    parts.push(`<div class="ops-row">TTS: <strong>${snap.voice?.detail || "—"}</strong></div>`);
+    const stt = snap.stt || {};
+    const sttLabel =
+      stt.state === "ready" ? "готово" : stt.state === "loading" ? "загрузка…" : "ожидание";
+    parts.push(`<div class="ops-row">STT: <strong>${sttLabel}</strong> · ${stt.model || ""}</div>`);
+    parts.push("</div>");
+
+    if (snap.setupScript) {
+      const sp = snap.setupScript;
+      parts.push('<div class="ops-section"><h3>Скрипт</h3>');
+      parts.push(`<div class="ops-job running"><strong>${sp.label}</strong></div>`);
+      parts.push(pctBar(sp.pct));
+      if (sp.detail) parts.push(`<div class="ops-row">${sp.detail}</div>`);
+      parts.push("</div>");
+    }
+
+    const assets = (snap.assets || []).filter((a) => !a.ready || a.active);
+    if (assets.length) {
+      parts.push('<div class="ops-section"><h3>Загрузки</h3>');
+      for (const a of assets) {
+        const pct = a.expectedBytes ? Math.min(100, Math.round((a.bytes / a.expectedBytes) * 100)) : 0;
+        const tag = a.ready ? "готово" : a.active ? "качается…" : pct ? `${pct}%` : "ожидание";
+        parts.push(`<div class="ops-row">${a.label} <strong>${tag}</strong> · ${formatMb(a.bytes)}</div>`);
+        if (!a.ready && a.expectedBytes) parts.push(pctBar(pct));
+      }
+      parts.push("</div>");
+    }
+
+    const jobs = snap.jobs || [];
+    if (jobs.length) {
+      parts.push('<div class="ops-section"><h3>Сейчас</h3>');
+      for (const j of jobs) {
+        const cls = j.status === "running" ? "running" : j.status === "error" ? "error" : "";
+        parts.push(`<div class="ops-job ${cls}"><strong>${j.label}</strong></div>`);
+        if (j.detail) parts.push(`<div class="ops-row">${j.detail}</div>`);
+        if (j.status === "running" && j.progress != null) parts.push(pctBar(j.progress));
+        else if (j.progressLabel) parts.push(`<div class="ops-row">${j.progressLabel}</div>`);
+      }
+      parts.push("</div>");
+    }
+
+    if (!jobs.length && !assets.length && !snap.setupScript) {
+      parts.push('<div class="ops-section"><div class="ops-row">Фон тихий.</div></div>');
+    }
+
+    opsBody.innerHTML = parts.join("");
+  }
+
+  async function refreshOpsHud() {
+    if (!api.getOpsSnapshot) return;
+    try {
+      const snap = await api.getOpsSnapshot();
+      renderOpsPanel(snap);
+    } catch (_) {}
+  }
+
+  if (opsCollapse && opsRail) {
+    opsCollapse.addEventListener("click", (e) => {
+      e.stopPropagation();
+      opsCollapsed = !opsCollapsed;
+      opsRail.classList.toggle("collapsed", opsCollapsed);
+    });
+  }
+
+  function formatCountdown(fireAt) {
+    const sec = Math.max(0, Math.floor((fireAt - Date.now()) / 1000));
+    if (sec < 60) return `через ${sec} сек`;
+    const min = Math.floor(sec / 60);
+    if (min < 60) return `через ${min} мин`;
+    const h = Math.floor(min / 60);
+    const m = min % 60;
+    return m ? `через ${h} ч ${m} мин` : `через ${h} ч`;
+  }
+
+  function formatClock(fireAt) {
+    const d = new Date(fireAt);
+    const now = new Date();
+    const sameDay =
+      d.getFullYear() === now.getFullYear() &&
+      d.getMonth() === now.getMonth() &&
+      d.getDate() === now.getDate();
+    if (sameDay) {
+      return d.toLocaleTimeString("ru-RU", { hour: "2-digit", minute: "2-digit" });
+    }
+    return d.toLocaleString("ru-RU", {
+      day: "2-digit",
+      month: "2-digit",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+  }
+
+  function shortMsg(msg, max) {
+    const t = String(msg || "").trim();
+    const cap = max || 42;
+    return t.length > cap ? t.slice(0, cap - 1) + "…" : t;
+  }
+
+  function renderRemindersList() {
+    if (!remindersList) return;
+    remindersList.innerHTML = "";
+    for (const r of remindersCache) {
+      if (r.fireAt <= Date.now()) continue;
+      const li = document.createElement("li");
+      li.className = "reminders-item";
+      const main = document.createElement("span");
+      main.className = "reminders-item-main";
+      main.textContent = `${formatClock(r.fireAt)} · ${shortMsg(r.message, 48)} · ${formatCountdown(r.fireAt)}`;
+      const btn = document.createElement("button");
+      btn.type = "button";
+      btn.className = "reminders-dismiss";
+      btn.title = "Снять напоминание";
+      btn.textContent = "×";
+      btn.addEventListener("click", (e) => {
+        e.stopPropagation();
+        if (api.cancelReminderId) void api.cancelReminderId(r.id).then(() => refreshRemindersHud());
+      });
+      li.appendChild(main);
+      li.appendChild(btn);
+      remindersList.appendChild(li);
+    }
+  }
+
+  async function submitTimerHud(inMinutes) {
+    const min = Math.max(1, Math.min(2880, Math.round(Number(inMinutes) || 0)));
+    if (!min || !api.scheduleReminderHud) return;
+    const msg = timerMsg ? String(timerMsg.value || "").trim() : "";
+    try {
+      const line = await api.scheduleReminderHud({ message: msg || "Таймер", inMinutes: min });
+      append("system", line);
+      if (timerMsg && !timerMsg.value.trim()) timerMsg.value = "";
+      remindersExpanded = true;
+      if (remindersActive) remindersActive.classList.remove("hidden");
+      void refreshRemindersHud();
+    } catch (e) {
+      append("system", "Таймер: " + (e.message || e));
+    }
+  }
+
+  function renderRemindersSummary() {
+    if (!remindersSummaryText) return;
+    const active = remindersCache.filter((r) => r.fireAt > Date.now());
+    if (!active.length) {
+      if (remindersActive) remindersActive.classList.add("hidden");
+      if (remindersTick) {
+        clearInterval(remindersTick);
+        remindersTick = null;
+      }
+      return;
+    }
+    if (remindersActive) remindersActive.classList.remove("hidden");
+    const next = active[0];
+    const n = active.length;
+    const extra = n > 1 ? ` (+${n - 1})` : "";
+    remindersSummaryText.textContent = `${shortMsg(next.message, 36)}${extra} · ${formatCountdown(next.fireAt)} · ${formatClock(next.fireAt)}`;
+    if (remindersExpanded) renderRemindersList();
+    if (!remindersTick) {
+      remindersTick = setInterval(() => {
+        const still = remindersCache.filter((r) => r.fireAt > Date.now());
+        if (!still.length) {
+          void refreshRemindersHud();
+          return;
+        }
+        renderRemindersSummary();
+      }, 1000);
+    }
+  }
+
+  async function refreshRemindersHud() {
+    if (!api.getReminders) return;
+    try {
+      remindersCache = await api.getReminders();
+      renderRemindersSummary();
+    } catch (_) {}
+  }
+
+  if (remindersToggle && remindersList && remindersChevron) {
+    remindersToggle.addEventListener("click", () => {
+      remindersExpanded = !remindersExpanded;
+      remindersList.classList.toggle("hidden", !remindersExpanded);
+      remindersChevron.textContent = remindersExpanded ? "▴" : "▾";
+      if (remindersExpanded) renderRemindersList();
+    });
+  }
+
+  if (timerForm && timerMin) {
+    timerForm.addEventListener("submit", (e) => {
+      e.preventDefault();
+      void submitTimerHud(timerMin.value);
+    });
+    for (const btn of timerForm.querySelectorAll(".timer-preset")) {
+      btn.addEventListener("click", (e) => {
+        e.preventDefault();
+        const m = Number(btn.getAttribute("data-min")) || 5;
+        timerMin.value = String(m);
+        void submitTimerHud(m);
+      });
+    }
+  }
 
   function stopAudio(extra) {
     audioGen += 1;
@@ -190,7 +435,7 @@
     setStatus("stopping", "thinking");
     try {
       const msg = await api.stopTask();
-      append("system", msg || "Остановлено, сэр.");
+      append("system", msg || "Остановил.");
       setStatus("online");
       setActivity("ожидание");
     } catch (e) {
@@ -218,7 +463,7 @@
       if (String(answer || "").startsWith("Systems error:")) {
         setStatus("error", "error");
         setActivity("самолечение…");
-      } else if (/^Остановлено/i.test(String(answer || ""))) {
+      } else if (/^Остановил/i.test(String(answer || ""))) {
         setStatus("online");
         setActivity("остановлено");
       } else {
@@ -644,8 +889,11 @@
     api.onReminder(({ text }) => {
       append("jarvis", text);
       setActivity("напоминание");
+      void refreshRemindersHud();
     });
   }
+  if (api.onRemindersChanged) api.onRemindersChanged(() => void refreshRemindersHud());
+  if (api.onOpsChanged) api.onOpsChanged(() => void refreshOpsHud());
 
   api.getConfig().then((cfg) => {
     muted = cfg.muted;
@@ -659,6 +907,9 @@
       "system",
       "JARVIS ready. CURSOR/LOCAL · STOP (Ctrl+Shift+X) · Ctrl+Shift+J = голос · Ctrl+Shift+H = HUD."
     );
+    void refreshRemindersHud();
+    void refreshOpsHud();
+    setInterval(() => void refreshOpsHud(), 5000);
   }).catch((e) => {
     setStatus("error", "error");
     append("system", "Config error: " + e);

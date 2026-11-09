@@ -135,7 +135,7 @@ async function bootstrapAgent(instance: SDKAgent): Promise<void> {
       "",
       dialogContext(1600),
       "",
-      'Acknowledge with exactly one short line, e.g. "JARVIS online." Do not call tools yet.',
+      'Acknowledge with one short natural line (e.g. "На связи."). No tools. Keep all future replies brief and human — Voice rules above.',
     ].join("\n"),
     { mode: "agent" }
   );
@@ -239,8 +239,9 @@ export async function askJarvis(userText: string): Promise<string> {
           "User said:",
           prompt,
           "",
-          "Decide and act yourself. Keep continuity with the current dialog above. Do not ask how to remember or whether to help — just be useful.",
-          "If you need a fresh look at the monitor, call see_screen (then Read the image path if needed).",
+          "Decide and act. Infer intent; pick tools/args yourself.",
+          "VOICE: brief, natural, human — usually one short sentence. After tools: just the result. No filler closers.",
+          "Keep dialog continuity. see_screen if you need the monitor.",
         ].join("\n");
 
     throwIfCancelled();
@@ -289,7 +290,7 @@ export async function askJarvis(userText: string): Promise<string> {
 
     finalText = finalText.trim();
     if (!finalText || /^done\.?$/i.test(finalText)) {
-      finalText = usedTool ? "Готово, сэр." : "Не совсем понял. Сделаю лучшее предположение в следующий раз — уточните цель, если нужно.";
+      finalText = usedTool ? "Готово." : "Не понял — скажи иначе.";
     }
 
     try {
@@ -307,7 +308,7 @@ export async function askJarvis(userText: string): Promise<string> {
     return answer;
   } catch (e) {
     if (isCancelError(e) || isCancelled()) {
-      const nice = "Остановлено, сэр.";
+      const nice = "Остановил.";
       emit({ type: "status", status: "idle", detail: "stopped" });
       emit({ type: "final", text: nice });
       return nice;
@@ -322,7 +323,7 @@ export async function askJarvis(userText: string): Promise<string> {
       return answer;
     } catch (e2) {
       if (isCancelError(e2) || isCancelled()) {
-        const nice = "Остановлено, сэр.";
+        const nice = "Остановил.";
         emit({ type: "status", status: "idle", detail: "stopped" });
         emit({ type: "final", text: nice });
         return nice;

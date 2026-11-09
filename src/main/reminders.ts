@@ -11,12 +11,19 @@ export type ReminderRecord = {
   fireAt: number;
 };
 
+export type ReminderHudItem = {
+  id: string;
+  message: string;
+  fireAt: number;
+};
+
 type DeliverOpts = {
   sendHud: (text: string) => void;
   hudVisible: () => boolean;
   hudFocused: () => boolean;
   speak?: (text: string) => Promise<void>;
   isMuted?: () => boolean;
+  onRemindersChanged?: () => void;
 };
 
 const MAX_DELAY_MS = 2 ** 31 - 1;
@@ -54,6 +61,14 @@ function loadRecords(): ReminderRecord[] {
 
 function saveRecords(list: ReminderRecord[]): void {
   fs.writeFileSync(remindersFile(), JSON.stringify(list, null, 2), "utf8");
+  deliverOpts?.onRemindersChanged?.();
+}
+
+export function getRemindersSnapshot(): ReminderHudItem[] {
+  return loadRecords()
+    .filter((r) => r.fireAt > Date.now())
+    .sort((a, b) => a.fireAt - b.fireAt)
+    .map(({ id, message, fireAt }) => ({ id, message, fireAt }));
 }
 
 function disarmAll(): void {
@@ -71,10 +86,123 @@ function formatWhen(fireAt: number): string {
   return new Date(fireAt).toLocaleString("ru-RU", {
     day: "2-digit",
     month: "2-digit",
+    year: "numeric",
     hour: "2-digit",
     minute: "2-digit",
     second: "2-digit",
   });
+}
+
+const MAX_FUTURE_MS = 365 * 24 * 60 * 60 * 1000;
+
+type ScheduleWhenOpts = {
+  inMinutes?: number;
+  inSeconds?: number;
+  fireAtIso?: string;
+  atTime?: string;
+  onDate?: string;
+};
+
+function parseClock(text: string): { h: number; m: number; s: number } | null {
+  const t = text.trim();
+  const m = /^(\d{1,2}):(\d{2})(?::(\d{2}))?$/.exec(t);
+  if (!m) return null;
+  const h = Number(m[1]);
+  const min = Number(m[2]);
+  const s = m[3] ? Number(m[3]) : 0;
+  if (h > 23 || min > 59 || s > 59) return null;
+  return { h, m: min, s };
+}
+
+function calendarParts(
+  onDate: string | undefined,
+  now: Date
+): { y: number; mo: number; d: number } | string {
+  const raw = onDate?.trim() ?? "";
+  const lower = raw.toLowerCase();
+  const y0 = now.getFullYear();
+  const mo0 = now.getMonth();
+  const d0 = now.getDate();
+
+  if (!raw || lower === "today" || lower === "сегодня") {
+    return { y: y0, mo: mo0, d: d0 };
+  }
+  if (lower === "tomorrow" || lower === "завтра") {
+    const next = new Date(y0, mo0, d0 + 1);
+    return { y: next.getFullYear(), mo: next.getMonth(), d: next.getDate() };
+  }
+
+  let m = /^(\d{4})-(\d{2})-(\d{2})$/.exec(raw);
+  if (m) {
+    const y = Number(m[1]);
+    const mo = Number(m[2]) - 1;
+    const d = Number(m[3]);
+    if (mo < 0 || mo > 11 || d < 1 || d > 31) return "Некорректная дата on_date.";
+    return { y, mo, d };
+  }
+
+  m = /^(\d{1,2})\.(\d{1,2})(?:\.(\d{2,4}))?$/.exec(raw);
+  if (m) {
+    const d = Number(m[1]);
+    const mo = Number(m[2]) - 1;
+    let y = m[3] ? Number(m[3]) : y0;
+    if (m[3] && m[3].length === 2) y = 2000 + y;
+    if (mo < 0 || mo > 11 || d < 1 || d > 31) return "Некорректная дата on_date.";
+    return { y, mo, d };
+  }
+
+  return "on_date: YYYY-MM-DD, DD.MM.YYYY, «сегодня»/«завтра».";
+}
+
+function resolveFireAt(opts: ScheduleWhenOpts): number | string {
+  const now = Date.now();
+  const nowDate = new Date();
+
+  const iso = opts.fireAtIso?.trim();
+  if (iso) {
+    const ms = Date.parse(iso);
+    if (!Number.isFinite(ms)) return "fire_at_iso: невалидная дата.";
+    if (ms <= now) return "Указанное время уже прошло.";
+    if (ms - now > MAX_FUTURE_MS) return "Слишком далёкая дата (лимит ~1 год).";
+    return ms;
+  }
+
+  const atTime = opts.atTime?.trim();
+  if (atTime) {
+    const clock = parseClock(atTime);
+    if (!clock) return "at_time: ожидается HH:MM или HH:MM:SS (локальное время).";
+
+    const parts = calendarParts(opts.onDate, nowDate);
+    if (typeof parts === "string") return parts;
+
+    let fire = new Date(parts.y, parts.mo, parts.d, clock.h, clock.m, clock.s, 0);
+    const explicitDate = Boolean(opts.onDate?.trim());
+
+    if (!explicitDate && fire.getTime() <= now) {
+      fire = new Date(parts.y, parts.mo, parts.d + 1, clock.h, clock.m, clock.s, 0);
+    }
+
+    const ms = fire.getTime();
+    if (ms <= now) return "Указанная дата и время уже прошли.";
+    if (ms - now > MAX_FUTURE_MS) return "Слишком далёкая дата (лимит ~1 год).";
+    return ms;
+  }
+
+  let delayMs = 0;
+  if (opts.inSeconds !== undefined && Number.isFinite(opts.inSeconds)) {
+    delayMs = Math.max(3, opts.inSeconds) * 1000;
+  } else if (opts.inMinutes !== undefined && Number.isFinite(opts.inMinutes)) {
+    delayMs = Math.max(0.05, opts.inMinutes) * 60 * 1000;
+  } else {
+    return "Укажите at_time (+ on_date), fire_at_iso, in_minutes или in_seconds.";
+  }
+
+  const relCap = 30 * 24 * 60 * 60 * 1000;
+  if (delayMs > relCap) delayMs = relCap;
+
+  const ms = now + delayMs;
+  if (ms - now > MAX_FUTURE_MS) return "Слишком далёкая дата (лимит ~1 год).";
+  return ms;
 }
 
 /** On the HUD host: fire or drop very stale rows. Else: no-op (do not delete from worker/MCP). */
@@ -246,6 +374,7 @@ function watchRemindersFile(): void {
         watchBusy = true;
         try {
           armAllPending();
+          deliverOpts?.onRemindersChanged?.();
         } finally {
           watchBusy = false;
         }
@@ -262,29 +391,18 @@ export function configureReminders(opts: DeliverOpts): void {
   watchRemindersFile();
   if (pruneTimer) clearInterval(pruneTimer);
   pruneTimer = setInterval(() => pruneExpiredReminders(), PRUNE_INTERVAL_MS);
+  opts.onRemindersChanged?.();
 }
 
-export function scheduleReminder(
-  message: string,
-  opts: { inMinutes?: number; inSeconds?: number }
-): string {
+export function scheduleReminder(message: string, opts: ScheduleWhenOpts): string {
   const text = String(message ?? "").trim();
   if (!text) return "Need reminder message.";
 
-  let delayMs = 0;
-  if (opts.inSeconds !== undefined && Number.isFinite(opts.inSeconds)) {
-    delayMs = Math.max(3, opts.inSeconds) * 1000;
-  } else if (opts.inMinutes !== undefined && Number.isFinite(opts.inMinutes)) {
-    delayMs = Math.max(0.05, opts.inMinutes) * 60 * 1000;
-  } else {
-    return "Set in_minutes or in_seconds.";
-  }
-
-  const cap = 30 * 24 * 60 * 60 * 1000;
-  if (delayMs > cap) delayMs = cap;
+  const resolved = resolveFireAt(opts);
+  if (typeof resolved === "string") return resolved;
 
   pruneInactiveReminders();
-  const fireAt = Date.now() + delayMs;
+  const fireAt = resolved;
   const id = `r-${Date.now()}-${Math.random().toString(36).slice(2, 9)}`;
   const record: ReminderRecord = { id, message: text, fireAt };
   const list = loadRecords();

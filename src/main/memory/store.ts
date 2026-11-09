@@ -104,7 +104,10 @@ function defaultSystem(): SystemFacts {
     browser: "Zen",
     ide: "Cursor (D:\\cursor\\Cursor.exe)",
     steamLibrary: "D:\\SteamLibrary",
-    notes: ["Stark OS / JARVIS живёт в D:\\Projects\\CursorProjects\\stark-os"],
+    notes: [
+      "Stark OS / JARVIS: D:\\Projects\\CursorProjects\\stark-os",
+      "Репозитории Cursor/IDE лежат в D:\\Projects\\CursorProjects (не путать с D:\\Projects).",
+    ],
     updatedAt: nowIso(),
   };
 }

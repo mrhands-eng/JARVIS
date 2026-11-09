@@ -17,6 +17,7 @@
     "language": "russian",
     "task": "transcribe"
   },
+  "piper": {},
   "maxChars": 1600,
-  "chunkSize": 320
+  "chunkSize": 280
 }
